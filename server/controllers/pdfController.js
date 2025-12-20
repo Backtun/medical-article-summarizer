@@ -20,12 +20,14 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { randomUUID } from 'crypto';
 import multer from 'multer';
+import '../config/env.js';
 import pdfService from '../services/pdfService.js';
 import aiService from '../services/aiService.js';
 import structureService from '../services/structureService.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const UPLOAD_DIR = path.join(__dirname, '../uploads');
+const CLIENT_URL = process.env.CLIENT_URL || process.env.SITE_URL || 'http://localhost:5173';
 
 // Asegurar que existe el directorio de uploads
 if (!fs.existsSync(UPLOAD_DIR)) {
@@ -60,29 +62,44 @@ const upload = multer({
  */
 export async function processPDF(req, res) {
   // Configurar headers para SSE
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
   res.setHeader('Connection', 'keep-alive');
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Origin', CLIENT_URL);
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  if (res.flushHeaders) res.flushHeaders();
+  res.write(':\n\n');
+
+  let clientClosed = false;
+  req.on('close', () => {
+    clientClosed = true;
+  });
+
+  const safeWrite = (payload) => {
+    if (clientClosed || res.writableEnded) return;
+    res.write(payload);
+  };
 
   const sendEvent = (data) => {
-    res.write(`data: ${JSON.stringify(data)}\n\n`);
+    safeWrite(`data: ${JSON.stringify(data)}\n\n`);
   };
 
   const sendLog = (text, color = 'white') => {
     sendEvent({ type: 'log', text, color, timestamp: new Date().toISOString() });
   };
 
+  let pdfPath = null;
+
   try {
     // Verificar que se subió un archivo (multer.single guarda en req.file)
     if (!req.file) {
       sendLog('✗ No PDF file uploaded', 'red');
       sendEvent({ type: 'error', message: 'No file uploaded' });
-      return res.end();
+      return;
     }
 
     const pdfFile = req.file;
-    const pdfPath = pdfFile.path;
+    pdfPath = pdfFile.path;
     const fileName = pdfFile.originalname;
 
     sendLog(`📥 File received: ${fileName}`, 'green');
@@ -100,7 +117,16 @@ export async function processPDF(req, res) {
     sendLog('STEP 2: Page Segmentation', 'yellow');
     sendLog('='.repeat(50), 'gray');
 
-    const pages = pdfService.splitIntoPages(pdfData.text, pdfData.numpages);
+    const pages = (pdfData.pages && pdfData.pages.length > 0)
+      ? pdfData.pages
+      : pdfService.splitIntoPages(pdfData.text, pdfData.numpages);
+
+    if (pages.length === 0) {
+      sendLog('✗ No pages detected in PDF', 'red');
+      sendEvent({ type: 'error', message: 'No pages detected in PDF' });
+      return;
+    }
+
     sendLog(`✓ Document split into ${pages.length} pages`, 'green');
 
     // Paso 3: Detectar estructura del documento
@@ -117,19 +143,33 @@ export async function processPDF(req, res) {
 
     const analyzedPages = [];
     let progress = 0;
-    const progressStep = 50 / pages.length; // 50% del progreso total
+    const progressStep = pages.length > 0 ? 50 / pages.length : 0; // 50% del progreso total
 
     for (let i = 0; i < pages.length; i++) {
+      if (clientClosed) {
+        return;
+      }
+
       const page = pages[i];
       sendLog(`Processing page ${i + 1}/${pages.length} (Page ${page.pageNumber})`, 'cyan');
 
       try {
-        const analysis = await aiService.analyzePage(page.text, page.pageNumber, sendLog);
-        analyzedPages.push({
-          pageNumber: page.pageNumber,
-          analysis,
-          text: page.text.substring(0, 500) // Preview del texto
-        });
+        const trimmed = page.text?.trim() || '';
+        if (!trimmed || trimmed.startsWith('[Página')) {
+          analyzedPages.push({
+            pageNumber: page.pageNumber,
+            analysis: '[Página omitida: sin texto extraíble]',
+            text: ''
+          });
+          sendLog(`⚠ Page ${page.pageNumber} skipped (no extractable text)`, 'orange');
+        } else {
+          const analysis = await aiService.analyzePage(page.text, page.pageNumber, sendLog);
+          analyzedPages.push({
+            pageNumber: page.pageNumber,
+            analysis,
+            text: page.text.substring(0, 500) // Preview del texto
+          });
+        }
       } catch (error) {
         sendLog(`⚠ Skipping page ${page.pageNumber} due to error`, 'orange');
         analyzedPages.push({
@@ -142,6 +182,10 @@ export async function processPDF(req, res) {
       // Actualizar progreso
       progress += progressStep;
       sendEvent({ type: 'progress', percent: Math.round(progress) });
+    }
+
+    if (clientClosed) {
+      return;
     }
 
     // Paso 5: Generar resumen estructurado IMRyD
@@ -183,18 +227,19 @@ export async function processPDF(req, res) {
     sendLog('✓ Processing complete!', 'green');
     sendEvent({ type: 'complete', result: { ...result, fileTree } });
 
-    // Limpiar archivo temporal
-    fs.unlink(pdfPath, (err) => {
-      if (err) sendLog(`⚠ Could not delete temp file: ${err.message}`, 'orange');
-    });
-
   } catch (error) {
     sendLog(`✗ Critical error: ${error.message}`, 'red');
     sendLog(error.stack, 'red');
     sendEvent({ type: 'error', message: error.message });
   } finally {
+    if (pdfPath) {
+      fs.unlink(pdfPath, (err) => {
+        if (err) sendLog(`⚠ Could not delete temp file: ${err.message}`, 'orange');
+      });
+    }
+
     // Cerrar conexión SSE
-    res.end();
+    if (!res.writableEnded) res.end();
   }
 }
 

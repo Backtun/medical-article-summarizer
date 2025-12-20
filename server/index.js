@@ -7,19 +7,22 @@
  * - CORS y manejo de archivos subidos
  */
 
+import path from 'path';
+import { fileURLToPath } from 'url';
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
+import './config/env.js';
 import pdfController from './controllers/pdfController.js';
-
-dotenv.config({ path: '../.env' });
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const CLIENT_URL = process.env.CLIENT_URL || process.env.SITE_URL || 'http://localhost:5173';
+const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 
 // Middleware
+app.disable('x-powered-by');
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:5173',
+  origin: CLIENT_URL,
   credentials: true
 }));
 app.use(express.json());
@@ -28,9 +31,6 @@ app.use(express.urlencoded({ extended: true }));
 // Deshabilitar el buffering para streams
 app.set('etag', false);
 
-// Servir archivos subidos temporalmente
-app.use('/uploads', express.static('uploads'));
-
 // Rutas API - con middleware multer para upload
 app.post('/api/process', pdfController.upload.single('pdf'), pdfController.processPDF);
 
@@ -38,6 +38,17 @@ app.post('/api/process', pdfController.upload.single('pdf'), pdfController.proce
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
+
+// Frontend en producción (SPA)
+if (IS_PRODUCTION) {
+  const __dirname = path.dirname(fileURLToPath(import.meta.url));
+  const clientDistPath = path.resolve(__dirname, '../client/dist');
+
+  app.use(express.static(clientDistPath));
+  app.get(/^\/(?!api).*/, (req, res) => {
+    res.sendFile(path.join(clientDistPath, 'index.html'));
+  });
+}
 
 // Manejo de errores global
 app.use((err, req, res, next) => {
@@ -50,7 +61,10 @@ app.use((err, req, res, next) => {
 
 app.listen(PORT, () => {
   console.log(`Medical Summarizer Server running on http://localhost:${PORT}`);
-  console.log(`OpenRouter Model: ${process.env.MODEL || 'openai/gpt-4o-mini'}`);
+  if (!process.env.OPENAI_API_KEY) {
+    console.warn('⚠ Missing OPENAI_API_KEY. The API will fail until it is set.');
+  }
+  console.log(`OpenRouter Model: ${process.env.MODEL || 'nvidia/nemotron-3-nano-30b-a3b:free'}`);
 });
 
 export default app;

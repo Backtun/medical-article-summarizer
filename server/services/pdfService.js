@@ -1,9 +1,8 @@
 /**
  * PDF Service - Extracción de Texto y Detección de Estructura
  *
- * Este servicio extrae texto de PDFs y lo divide en páginas reales.
- * Nota: pdf-parse no divide por páginas nativamente, así que usamos
- * una estrategia de distribución uniforme basada en el número real de páginas.
+ * Este servicio extrae texto de PDFs y lo divide en páginas reales con pagerender.
+ * Si la extracción por página es incompleta, usa un fallback de distribución uniforme.
  */
 
 import fs from 'fs';
@@ -16,34 +15,76 @@ import pdf from 'pdf-parse';
  * @returns {Promise<Object>} - Objeto con texto y metadatos
  */
 export async function extractTextFromPDF(pdfPath, onLog) {
+  const log = (message, color = 'white') => {
+    if (onLog) onLog(message, color);
+  };
+
   try {
-    onLog({
-      type: 'log',
-      text: '📄 Loading PDF file...',
-      color: 'cyan'
-    });
+    log('📄 Loading PDF file...', 'cyan');
 
     const dataBuffer = fs.readFileSync(pdfPath);
-    const pdfData = await pdf(dataBuffer);
+    const pageTexts = [];
+    const renderPage = (pageData) =>
+      pageData.getTextContent({ normalizeWhitespace: true }).then((textContent) => {
+        let lastY = null;
+        let text = '';
 
-    onLog({
-      type: 'log',
-      text: `✓ PDF loaded: ${pdfData.numpages} pages detected`,
-      color: 'green'
-    });
+        for (const item of textContent.items) {
+          if (!item.str) continue;
+          if (lastY === item.transform[5] || lastY === null) {
+            text += item.str;
+          } else {
+            text += `\n${item.str}`;
+          }
+          lastY = item.transform[5];
+        }
+
+        const pageNumber = pageData.pageNumber;
+        if (Number.isInteger(pageNumber) && pageNumber > 0) {
+          pageTexts[pageNumber - 1] = text;
+        } else {
+          pageTexts.push(text);
+        }
+        return text;
+      });
+
+    const pdfData = await pdf(dataBuffer, { pagerender: renderPage });
+
+    log(`✓ PDF loaded: ${pdfData.numpages} pages detected`, 'green');
+
+    let pages = [];
+    let hasAllPages = pageTexts.length === pdfData.numpages;
+    if (hasAllPages) {
+      for (let i = 0; i < pdfData.numpages; i++) {
+        if (typeof pageTexts[i] !== 'string') {
+          hasAllPages = false;
+          break;
+        }
+      }
+    }
+
+    if (hasAllPages) {
+      pages = pageTexts.map((text, index) => {
+        const trimmed = text.trim();
+        return {
+          pageNumber: index + 1,
+          text: trimmed.length > 0 ? trimmed : '[Página sin texto extraíble]'
+        };
+      });
+    } else {
+      log('⚠ Page-level extraction incomplete; using fallback segmentation.', 'orange');
+      pages = splitIntoPages(pdfData.text, pdfData.numpages);
+    }
 
     return {
       numpages: pdfData.numpages,
       text: pdfData.text,
       metadata: pdfData.metadata,
+      pages,
       rawData: dataBuffer
     };
   } catch (error) {
-    onLog({
-      type: 'log',
-      text: `✗ Error loading PDF: ${error.message}`,
-      color: 'red'
-    });
+    log(`✗ Error loading PDF: ${error.message}`, 'red');
     throw error;
   }
 }
@@ -55,6 +96,10 @@ export async function extractTextFromPDF(pdfPath, onLog) {
  * @returns {Array} - Array de objetos { pageNumber, text }
  */
 export function splitIntoPages(fullText, numPages) {
+  if (!numPages || numPages <= 0) {
+    return [];
+  }
+
   // Si no hay texto o número de páginas inválido
   if (!fullText || fullText.trim().length === 0) {
     return Array.from({ length: numPages }, (_, i) => ({
@@ -63,7 +108,7 @@ export function splitIntoPages(fullText, numPages) {
     }));
   }
 
-  const lines = fullText.split('\n');
+  const lines = fullText.split(/\r?\n/);
   const totalLines = lines.length;
   const linesPerPage = Math.ceil(totalLines / numPages);
 
@@ -91,11 +136,11 @@ export function splitIntoPages(fullText, numPages) {
  * @returns {Object} - Estructura detectada { parts, chapters }
  */
 export function detectStructure(pages, onLog) {
-  onLog({
-    type: 'log',
-    text: '🔍 Analyzing document structure...',
-    color: 'cyan'
-  });
+  const log = (message, color = 'white') => {
+    if (onLog) onLog(message, color);
+  };
+
+  log('🔍 Analyzing document structure...', 'cyan');
 
   const structure = {
     parts: [],
@@ -126,11 +171,7 @@ export function detectStructure(pages, onLog) {
           chapters: []
         };
         structure.parts.push(currentPart);
-        onLog({
-          type: 'log',
-          text: `  📁 Detected: ${currentPart.title}`,
-          color: 'magenta'
-        });
+        log(`  📁 Detected: ${currentPart.title}`, 'magenta');
       }
 
       if (chapterMatch && currentPart) {
@@ -143,11 +184,7 @@ export function detectStructure(pages, onLog) {
         };
         currentPart.chapters.push(currentChapter);
         structure.chapters.push(currentChapter);
-        onLog({
-          type: 'log',
-          text: `    📂 Detected: ${currentChapter.title}`,
-          color: 'blue'
-        });
+        log(`    📂 Detected: ${currentChapter.title}`, 'blue');
       }
     }
   }
@@ -163,11 +200,7 @@ export function detectStructure(pages, onLog) {
     });
   }
 
-  onLog({
-    type: 'log',
-    text: `✓ Structure analysis: ${structure.parts.length} parts, ${structure.chapters.length} chapters`,
-    color: 'green'
-  });
+  log(`✓ Structure analysis: ${structure.parts.length} parts, ${structure.chapters.length} chapters`, 'green');
 
   return structure;
 }

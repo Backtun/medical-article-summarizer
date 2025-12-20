@@ -7,8 +7,6 @@
  * - Generar estructura de bases de conocimiento
  */
 
-import path from 'path';
-
 /**
  * Formatea metadatos para mostrar en UI
  * @param {Object} metadata - Metadatos del PDF

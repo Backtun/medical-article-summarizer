@@ -24,6 +24,7 @@ async function* readSSEStream(reader) {
     if (done) break;
 
     buffer += decoder.decode(value, { stream: true });
+    buffer = buffer.replace(/\r\n/g, '\n');
     const lines = buffer.split('\n\n');
     buffer = lines.pop();
 
@@ -45,6 +46,7 @@ async function* readSSEStream(reader) {
  */
 function useProcessing() {
   const abortControllerRef = useRef(null);
+  const apiBaseUrl = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
 
   /**
    * Inicia el procesamiento de un PDF
@@ -54,17 +56,20 @@ function useProcessing() {
   const connect = useCallback(async (file, callbacks) => {
     const { onLog, onProgress, onComplete, onError } = callbacks;
 
+    let controller = null;
+
     try {
       // Crear FormData para upload del archivo
       const formData = new FormData();
       formData.append('pdf', file);
 
-      abortControllerRef.current = new AbortController();
+      controller = new AbortController();
+      abortControllerRef.current = controller;
 
-      const response = await fetch('/api/process', {
+      const response = await fetch(`${apiBaseUrl}/api/process`, {
         method: 'POST',
         body: formData,
-        signal: abortControllerRef.current.signal
+        signal: controller.signal
       });
 
       if (!response.ok) {
@@ -73,6 +78,10 @@ function useProcessing() {
       }
 
       // El cuerpo es un stream SSE
+      if (!response.body) {
+        throw new Error('Empty response body from server');
+      }
+
       const reader = response.body.getReader();
 
       for await (const data of readSSEStream(reader)) {
@@ -85,9 +94,15 @@ function useProcessing() {
             break;
           case 'complete':
             onComplete(data);
+            if (abortControllerRef.current === controller) {
+              abortControllerRef.current = null;
+            }
             return;
           case 'error':
             onError(new Error(data.message));
+            if (abortControllerRef.current === controller) {
+              abortControllerRef.current = null;
+            }
             return;
           default:
             break;
@@ -96,6 +111,10 @@ function useProcessing() {
     } catch (error) {
       if (error.name !== 'AbortError') {
         onError(error);
+      }
+    } finally {
+      if (abortControllerRef.current === controller) {
+        abortControllerRef.current = null;
       }
     }
   }, []);

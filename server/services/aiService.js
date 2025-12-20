@@ -7,10 +7,8 @@
  */
 
 import OpenAI from 'openai';
-import dotenv from 'dotenv';
+import '../config/env.js';
 import { PAGE_ANALYSIS_PROMPT, SUMMARY_GENERATION_PROMPT } from '../utils/prompts.js';
-
-dotenv.config({ path: '../.env' });
 
 // Configuración del cliente OpenRouter
 const client = new OpenAI({
@@ -30,14 +28,17 @@ const client = new OpenAI({
  * @returns {Promise<string>} - Análisis de la página
  */
 export async function analyzePage(pageText, pageNumber, onLog) {
-  const model = process.env.MODEL || 'openai/gpt-5-mini';
+  const model = process.env.MODEL || 'nvidia/nemotron-3-nano-30b-a3b:free';
+  const log = (message, color = 'white') => {
+    if (onLog) onLog(message, color);
+  };
+
+  if (!process.env.OPENAI_API_KEY) {
+    throw new Error('Missing OPENAI_API_KEY. Configure it in .env.');
+  }
 
   try {
-    onLog({
-      type: 'log',
-      text: `🤖 Analyzing page ${pageNumber} with ${model}...`,
-      color: 'cyan'
-    });
+    log(`🤖 Analyzing page ${pageNumber} with ${model}...`, 'cyan');
 
     const response = await client.chat.completions.create({
       model: model,
@@ -57,19 +58,11 @@ export async function analyzePage(pageText, pageNumber, onLog) {
 
     const analysis = response.choices[0].message.content;
 
-    onLog({
-      type: 'log',
-      text: `✓ Page ${pageNumber} analyzed (${analysis.length} chars)`,
-      color: 'green'
-    });
+    log(`✓ Page ${pageNumber} analyzed (${analysis.length} chars)`, 'green');
 
     return analysis;
   } catch (error) {
-    onLog({
-      type: 'log',
-      text: `✗ Error analyzing page ${pageNumber}: ${error.message}`,
-      color: 'red'
-    });
+    log(`✗ Error analyzing page ${pageNumber}: ${error.message}`, 'red');
     throw error;
   }
 }
@@ -82,14 +75,17 @@ export async function analyzePage(pageText, pageNumber, onLog) {
  * @returns {Promise<string>} - Resumen estructurado en Markdown
  */
 export async function generateSummary(title, analyzedPages, onLog) {
-  const model = process.env.MODEL || 'openai/gpt-5-mini';
+  const model = process.env.MODEL || 'nvidia/nemotron-3-nano-30b-a3b:free';
+  const log = (message, color = 'white') => {
+    if (onLog) onLog(message, color);
+  };
+
+  if (!process.env.OPENAI_API_KEY) {
+    throw new Error('Missing OPENAI_API_KEY. Configure it in .env.');
+  }
 
   try {
-    onLog({
-      type: 'log',
-      text: '📝 Generating structured summary (IMRyD format)...',
-      color: 'yellow'
-    });
+    log('📝 Generating structured summary (IMRyD format)...', 'yellow');
 
     // Combinar análisis de páginas - extraer la propiedad .analysis de cada objeto
     const combinedAnalysis = analyzedPages
@@ -119,19 +115,11 @@ export async function generateSummary(title, analyzedPages, onLog) {
 
     const summary = response.choices[0].message.content;
 
-    onLog({
-      type: 'log',
-      text: `✓ Summary generated (${summary.length} chars)`,
-      color: 'green'
-    });
+    log(`✓ Summary generated (${summary.length} chars)`, 'green');
 
     return summary;
   } catch (error) {
-    onLog({
-      type: 'log',
-      text: `✗ Error generating summary: ${error.message}`,
-      color: 'red'
-    });
+    log(`✗ Error generating summary: ${error.message}`, 'red');
     throw error;
   }
 }

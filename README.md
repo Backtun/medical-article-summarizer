@@ -91,17 +91,22 @@ medical-article-summarizer/
 | `OPENAI_API_KEY` | API key de OpenRouter | `sk-or-v1-...` |
 | `MODEL` | Modelo de IA a usar | `nvidia/nemotron-3-nano-30b-a3b:free` |
 | `PORT` | Puerto del servidor | `3001` |
-| `SITE_URL` | URL del sitio | `http://localhost:5173` |
+| `SITE_URL` | URL del sitio (OpenRouter tracking) | `http://localhost:5173` |
+| `SITE_NAME` | Nombre del sitio (OpenRouter tracking) | `Medical Summarizer` |
+| `CLIENT_URL` | Origen permitido para CORS (fallback a `SITE_URL`) | `http://localhost:5173` |
 
 ## Scripts Disponibles
 
 - `npm run install:all`: Instala todas las dependencias
 - `npm run dev`: Inicia frontend y backend en modo desarrollo
-- `npm start`: Inicia solo el backend en producción
+- `npm run build`: Compila el frontend para producción
+- `npm start`: Inicia el backend en producción (sirve el frontend si existe `client/dist`)
+- `npm run test --prefix server`: Ejecuta tests unitarios del backend
 
 ## Seguridad
 
 ⚠️ **IMPORTANTE**: El archivo `.env` nunca debe subirse a GitHub. Ya está configurado en `.gitignore`.
+⚠️ **Privacidad**: No subas PDFs con datos sensibles/PHI sin autorización. El contenido se envía a OpenRouter para el análisis.
 
 ## Contribuir
 
@@ -184,11 +189,15 @@ git push -u origin main
 
 ## Despliegue
 
-Para desplegar en producción, considera:
+Para producción en un solo servicio (recomendado):
 
-- **Frontend**: Vercel, Netlify o GitHub Pages
-- **Backend**: Heroku, Railway, Render o AWS
-- **Variables de entorno**: Configura las variables en el servicio de despliegue
+1. `npm run build`
+2. Define `NODE_ENV=production`
+3. `npm start` (Express servirá `client/dist`)
+
+Si separas frontend y backend:
+- Configura `VITE_API_URL` en el frontend apuntando al backend.
+- Configura `CLIENT_URL` en el backend para CORS.
 
 ## Problemas Comunes
 
@@ -196,7 +205,7 @@ Para desplegar en producción, considera:
 Asegúrate de tener una API key válida de OpenRouter en tu archivo `.env`
 
 ### Error de CORS
-Verifica que `SITE_URL` en el backend coincida con la URL de tu frontend
+Verifica que `CLIENT_URL` (o `SITE_URL` como fallback) coincida con la URL de tu frontend
 
 ### Archivos PDF grandes
 El límite de tamaño depende de tu plan en OpenRouter y la configuración de tu servidor
