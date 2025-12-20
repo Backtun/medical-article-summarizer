@@ -1,0 +1,19 @@
+{
+  "name": "medical-summarizer-server",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Backend server for Medical Summarizer",
+  "main": "index.js",
+  "scripts": {
+    "dev": "node index.js",
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "multer": "^1.4.5-lts.1",
+    "openai": "^4.24.1",
+    "pdf-parse": "^1.1.1"
+  }
+}

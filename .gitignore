@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Environment variables
+.env
+
+# Uploads directory (keep folder structure but ignore files)
+server/uploads/*
+!server/uploads/.gitkeep
+
+# Build outputs
+dist/
+build/
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Claude AI files
+.claude/
+
+# Temporary files
+*.tmp
+.cache/

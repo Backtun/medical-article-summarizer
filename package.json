@@ -1,0 +1,16 @@
+{
+  "name": "medical-summarizer",
+  "version": "1.0.0",
+  "description": "Medical article summarizer with AI - MERN Stack",
+  "scripts": {
+    "install:all": "npm install && cd client && npm install && cd ../server && npm install",
+    "dev": "concurrently \"npm run dev --prefix server\" \"npm run dev --prefix client\"",
+    "start": "node server/index.js"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "keywords": ["medical", "summarizer", "ai", "mern", "openrouter"],
+  "author": "",
+  "license": "MIT"
+}
