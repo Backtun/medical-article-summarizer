@@ -6,12 +6,36 @@
     "install:all": "npm install && cd client && npm install && cd ../server && npm install",
     "dev": "concurrently \"npm run dev --prefix server\" \"npm run dev --prefix client\"",
     "build": "npm run build --prefix client",
-    "start": "node server/index.js"
+    "start": "node server/index.js",
+    "test": "npm run test --prefix server",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "prepare": "husky || true"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "concurrently": "^8.2.2",
+    "eslint": "^8.56.0",
+    "husky": "^9.0.11",
+    "lint-staged": "^15.2.0",
+    "prettier": "^3.2.4"
   },
-  "keywords": ["medical", "summarizer", "ai", "mern", "openrouter"],
+  "keywords": [
+    "medical",
+    "summarizer",
+    "ai",
+    "mern",
+    "openrouter",
+    "imryd"
+  ],
   "author": "",
-  "license": "MIT"
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/backtun/medical-article-summarizer"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
 }

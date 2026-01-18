@@ -85,6 +85,15 @@ function App() {
 
   return (
     <div className="app">
+      {/* Disclaimer Banner */}
+      <div className="disclaimer-banner">
+        <span className="disclaimer-icon">⚠️</span>
+        <span className="disclaimer-text">
+          <strong>Aviso:</strong> Este servicio es informativo y no constituye consejo médico.
+          Los resúmenes son generados por IA y deben verificarse con el documento original.
+        </span>
+      </div>
+
       <header className="app-header">
         <h1>🏥 Resumen médico</h1>
         <p>Analiza artículos médicos con IA y genera resúmenes IMRyD</p>
@@ -125,7 +134,12 @@ function App() {
       </main>
 
       <footer className="app-footer">
-        <p>Powered by OpenRouter AI • MERN Stack</p>
+        <p className="footer-disclaimer">
+          ⚠️ Generado por IA • No constituye consejo médico • Verificar siempre con el documento original
+        </p>
+        <p className="footer-tech">
+          Powered by OpenRouter AI • MERN Stack • v1.0.0
+        </p>
       </footer>
     </div>
   );

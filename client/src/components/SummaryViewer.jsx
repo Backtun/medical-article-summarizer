@@ -11,6 +11,7 @@ import { useState, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import clsx from 'clsx';
+import ExportButtons from './ExportButtons';
 import './SummaryViewer.css';
 
 /**
@@ -114,6 +115,14 @@ function SummaryViewer({ result, onReset }) {
         </span>
         <span className="info-item">
           ⏱️ {new Date(result.processedAt).toLocaleString()}
+        </span>
+      </div>
+
+      {/* Export and disclaimer */}
+      <div className="viewer-actions">
+        <ExportButtons result={result} />
+        <span className="viewer-disclaimer">
+          ⚠️ Generado por IA • Verificar con documento original
         </span>
       </div>
 

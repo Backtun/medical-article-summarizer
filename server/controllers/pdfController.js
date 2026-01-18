@@ -1,48 +1,63 @@
 /**
  * PDF Controller - Orquestación Principal del Procesamiento
  *
- * Este controlador implementa la lógica central que replica el script Python:
- * 1. Recibe archivo PDF via upload
+ * Este controlador implementa la lógica central:
+ * 1. Recibe archivo PDF via upload con validación de seguridad
  * 2. Configura SSE para logs en tiempo real
  * 3. Orquesta: PDF -> Texto -> Estructura -> Análisis IA -> Resumen
  * 4. Retorna estructura JSON con conocimiento organizado
  *
- * Legacy Note: Este controlador reemplaza la función main() del script Python:
- *   def main(pdf_path, output_dir):
- *       doc = fitz.open(pdf_path)
- *       for page in tqdm(doc, desc="Processing"):
- *           analyze_page(page)
- *       generate_summary()
+ * Security Features:
+ * - PDF magic byte validation
+ * - Page count limits
+ * - Parsing timeout
+ * - Sanitized logging
  */
 
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
-import { randomUUID } from 'crypto';
+import {
+  fileURLToPath
+} from 'url';
+import {
+  randomUUID,
+  createHash
+} from 'crypto';
 import multer from 'multer';
 import '../config/env.js';
 import pdfService from '../services/pdfService.js';
 import aiService from '../services/aiService.js';
 import structureService from '../services/structureService.js';
+import pdfValidator from '../utils/pdfValidator.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const __dirname = path.dirname(fileURLToPath(
+  import.meta.url));
 const UPLOAD_DIR = path.join(__dirname, '../uploads');
 const CLIENT_URL = process.env.CLIENT_URL || process.env.SITE_URL || 'http://localhost:5173';
 
+// Configuration
+const MAX_PAGES = parseInt(process.env.MAX_PAGES || '100', 10);
+const PARSING_TIMEOUT_MS = parseInt(process.env.PARSING_TIMEOUT_MS || '60000', 10);
+
 // Asegurar que existe el directorio de uploads
 if (!fs.existsSync(UPLOAD_DIR)) {
-  fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+  fs.mkdirSync(UPLOAD_DIR, {
+    recursive: true
+  });
 }
 
 // Configuración de multer para uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, UPLOAD_DIR),
-  filename: (req, file, cb) => cb(null, `${randomUUID()}-${file.originalname}`)
+  // Use only UUID for filename (security: avoid path traversal via originalname)
+  filename: (req, file, cb) => cb(null, `${randomUUID()}.pdf`)
 });
 
 const upload = multer({
   storage,
-  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB max
+  limits: {
+    fileSize: 50 * 1024 * 1024
+  }, // 50MB max
   fileFilter: (req, file, cb) => {
     if (file.mimetype === 'application/pdf') {
       cb(null, true);
@@ -51,6 +66,16 @@ const upload = multer({
     }
   }
 });
+
+/**
+ * Calculate SHA256 hash of a file for caching purposes
+ * @param {string} filePath - Path to file
+ * @returns {string} - Hex hash
+ */
+function calculateFileHash(filePath) {
+  const buffer = fs.readFileSync(filePath);
+  return createHash('sha256').update(buffer).digest('hex');
+}
 
 /**
  * Procesa un PDF y genera resúmenes estructurados
@@ -84,17 +109,28 @@ export async function processPDF(req, res) {
     safeWrite(`data: ${JSON.stringify(data)}\n\n`);
   };
 
+  // Sanitized logging - don't expose internal paths to client
   const sendLog = (text, color = 'white') => {
-    sendEvent({ type: 'log', text, color, timestamp: new Date().toISOString() });
+    // Sanitize: remove file paths from logs
+    const sanitizedText = text.replace(/\/[\w\/\-\.]+/g, '[path]');
+    sendEvent({
+      type: 'log',
+      text: sanitizedText,
+      color,
+      timestamp: new Date().toISOString()
+    });
   };
 
   let pdfPath = null;
 
   try {
-    // Verificar que se subió un archivo (multer.single guarda en req.file)
+    // Verificar que se subió un archivo
     if (!req.file) {
       sendLog('✗ No PDF file uploaded', 'red');
-      sendEvent({ type: 'error', message: 'No file uploaded' });
+      sendEvent({
+        type: 'error',
+        message: 'No file uploaded'
+      });
       return;
     }
 
@@ -103,47 +139,113 @@ export async function processPDF(req, res) {
     const fileName = pdfFile.originalname;
 
     sendLog(`📥 File received: ${fileName}`, 'green');
-    sendLog(`📁 Temporary path: ${pdfPath}`, 'gray');
 
-    // Paso 1: Extraer texto del PDF
+    // ========================================
+    // SECURITY VALIDATION
+    // ========================================
+    sendLog('🔒 Validating PDF security...', 'cyan');
+
+    // Validate PDF magic bytes
+    try {
+      pdfValidator.validatePDFMagicBytes(pdfPath);
+      sendLog('✓ PDF format validated', 'green');
+    } catch (error) {
+      sendLog(`✗ Invalid PDF: ${error.message}`, 'red');
+      sendEvent({
+        type: 'error',
+        message: 'Invalid PDF file format'
+      });
+      return;
+    }
+
+    // Calculate file hash for potential caching
+    const fileHash = calculateFileHash(pdfPath);
+    sendLog(`📋 Document hash: ${fileHash.substring(0, 12)}...`, 'gray');
+
+    // ========================================
+    // STEP 1: PDF Text Extraction (with timeout)
+    // ========================================
     sendLog('='.repeat(50), 'gray');
     sendLog('STEP 1: PDF Text Extraction', 'yellow');
     sendLog('='.repeat(50), 'gray');
 
-    const pdfData = await pdfService.extractTextFromPDF(pdfPath, sendLog);
+    // Wrap extraction with timeout
+    let pdfData;
+    try {
+      pdfData = await pdfValidator.withTimeout(
+        pdfService.extractTextFromPDF(pdfPath, sendLog),
+        PARSING_TIMEOUT_MS,
+        'PDF extraction'
+      );
+    } catch (error) {
+      if (error.message.includes('timed out')) {
+        sendLog(`✗ PDF extraction timed out after ${PARSING_TIMEOUT_MS / 1000}s`, 'red');
+        sendEvent({
+          type: 'error',
+          message: 'PDF processing timeout. The file may be too complex or corrupted.'
+        });
+      } else {
+        sendLog(`✗ PDF extraction failed: ${error.message}`, 'red');
+        sendEvent({
+          type: 'error',
+          message: `Failed to extract text: ${error.message}`
+        });
+      }
+      return;
+    }
 
-    // Paso 2: Dividir en páginas
+    // ========================================
+    // STEP 2: Page Segmentation
+    // ========================================
     sendLog('='.repeat(50), 'gray');
     sendLog('STEP 2: Page Segmentation', 'yellow');
     sendLog('='.repeat(50), 'gray');
 
-    const pages = (pdfData.pages && pdfData.pages.length > 0)
-      ? pdfData.pages
-      : pdfService.splitIntoPages(pdfData.text, pdfData.numpages);
+    const pages = (pdfData.pages && pdfData.pages.length > 0) ?
+      pdfData.pages :
+      pdfService.splitIntoPages(pdfData.text, pdfData.numpages);
 
     if (pages.length === 0) {
       sendLog('✗ No pages detected in PDF', 'red');
-      sendEvent({ type: 'error', message: 'No pages detected in PDF' });
+      sendEvent({
+        type: 'error',
+        message: 'No pages detected in PDF'
+      });
       return;
     }
 
-    sendLog(`✓ Document split into ${pages.length} pages`, 'green');
+    // Validate page count
+    try {
+      pdfValidator.validatePageCount(pages.length, MAX_PAGES);
+      sendLog(`✓ Document has ${pages.length} pages (limit: ${MAX_PAGES})`, 'green');
+    } catch (error) {
+      sendLog(`✗ ${error.message}`, 'red');
+      sendEvent({
+        type: 'error',
+        message: error.message
+      });
+      return;
+    }
 
-    // Paso 3: Detectar estructura del documento
+    // ========================================
+    // STEP 3: Structure Detection
+    // ========================================
     sendLog('='.repeat(50), 'gray');
-    sendLog('STEP 3: Structure Detection', 'yellow');
+    sendLog('STEP 3: Structure Detection (IMRyD)', 'yellow');
     sendLog('='.repeat(50), 'gray');
 
     const structure = pdfService.detectStructure(pages, sendLog);
 
-    // Paso 4: Analizar cada página con IA
+    // ========================================
+    // STEP 4: AI Page Analysis
+    // ========================================
     sendLog('='.repeat(50), 'gray');
     sendLog('STEP 4: AI Page Analysis', 'yellow');
     sendLog('='.repeat(50), 'gray');
 
     const analyzedPages = [];
     let progress = 0;
-    const progressStep = pages.length > 0 ? 50 / pages.length : 0; // 50% del progreso total
+    const progressStep = pages.length > 0 ? 50 / pages.length : 0;
 
     for (let i = 0; i < pages.length; i++) {
       if (clientClosed) {
@@ -151,10 +253,10 @@ export async function processPDF(req, res) {
       }
 
       const page = pages[i];
-      sendLog(`Processing page ${i + 1}/${pages.length} (Page ${page.pageNumber})`, 'cyan');
+      sendLog(`Processing page ${i + 1}/${pages.length}`, 'cyan');
 
       try {
-        const trimmed = page.text?.trim() || '';
+        const trimmed = (page.text && page.text.trim) ? page.text.trim() : '';
         if (!trimmed || trimmed.startsWith('[Página')) {
           analyzedPages.push({
             pageNumber: page.pageNumber,
@@ -163,11 +265,13 @@ export async function processPDF(req, res) {
           });
           sendLog(`⚠ Page ${page.pageNumber} skipped (no extractable text)`, 'orange');
         } else {
-          const analysis = await aiService.analyzePage(page.text, page.pageNumber, sendLog);
+          // Sanitize text before sending to AI (basic prompt injection protection)
+          const sanitizedText = pdfValidator.sanitizeTextForPrompt(page.text);
+          const analysis = await aiService.analyzePage(sanitizedText, page.pageNumber, sendLog);
           analyzedPages.push({
             pageNumber: page.pageNumber,
             analysis,
-            text: page.text.substring(0, 500) // Preview del texto
+            text: page.text.substring(0, 500) // Preview only
           });
         }
       } catch (error) {
@@ -175,39 +279,59 @@ export async function processPDF(req, res) {
         analyzedPages.push({
           pageNumber: page.pageNumber,
           analysis: `[Error analyzing page: ${error.message}]`,
-          text: page.text.substring(0, 500)
+          text: (page.text && page.text.substring) ? page.text.substring(0, 500) : ''
         });
       }
 
-      // Actualizar progreso
       progress += progressStep;
-      sendEvent({ type: 'progress', percent: Math.round(progress) });
+      sendEvent({
+        type: 'progress',
+        percent: Math.round(progress)
+      });
     }
 
     if (clientClosed) {
       return;
     }
 
-    // Paso 5: Generar resumen estructurado IMRyD
+    // ========================================
+    // STEP 5: Generate IMRyD Summary
+    // ========================================
     sendLog('='.repeat(50), 'gray');
     sendLog('STEP 5: Generate IMRyD Summary', 'yellow');
     sendLog('='.repeat(50), 'gray');
 
-    const title = pdfData.metadata?.Title || fileName.replace('.pdf', '');
-
-    // Agrupar análisis por estructura
+    const title = (pdfData.metadata && pdfData.metadata.Title) ? pdfData.metadata.Title : fileName.replace('.pdf', '');
     const groupedAnalysis = structureService.groupAnalysisByStructure(analyzedPages, structure);
-
-    // Generar resumen final
     const summaryMarkdown = await aiService.generateSummary(title, analyzedPages, sendLog);
 
-    // Enviar progreso final
-    sendEvent({ type: 'progress', percent: 100 });
+    sendEvent({
+      type: 'progress',
+      percent: 100
+    });
 
-    // Paso 6: Organizar resultado final
+    // ========================================
+    // STEP 6: Final Organization
+    // ========================================
     sendLog('='.repeat(50), 'gray');
     sendLog('STEP 6: Final Organization', 'yellow');
     sendLog('='.repeat(50), 'gray');
+
+    // Add mandatory disclaimer to summary
+    const disclaimerSection = `
+
+---
+
+## ⚠️ Aviso Importante
+
+> **Este resumen es informativo y no constituye consejo médico.**
+> 
+> - Generado automáticamente por inteligencia artificial
+> - Verificar siempre la información con el documento original
+> - Consultar con profesionales de la salud para decisiones clínicas
+> - No utilizar como única fuente para diagnóstico o tratamiento
+
+`;
 
     const result = {
       title,
@@ -215,33 +339,52 @@ export async function processPDF(req, res) {
       totalPages: pages.length,
       structure,
       pages: analyzedPages,
-      summary: summaryMarkdown,
+      summary: summaryMarkdown + disclaimerSection,
       groupedContent: groupedAnalysis,
       metadata: pdfData.metadata,
-      processedAt: new Date().toISOString()
+      processedAt: new Date().toISOString(),
+      documentHash: fileHash.substring(0, 16),
+      disclaimer: 'Este resumen es informativo y no constituye consejo médico. Consulte siempre con un profesional de la salud.'
     };
 
-    // Construir árbol de archivos para el frontend
     const fileTree = structureService.buildFileTree(result);
 
     sendLog('✓ Processing complete!', 'green');
-    sendEvent({ type: 'complete', result: { ...result, fileTree } });
+    sendLog('⚠️ Recuerde: Este resumen es informativo, no consejo médico.', 'yellow');
+    sendEvent({
+      type: 'complete',
+      result: {
+        ...result,
+        fileTree
+      }
+    });
 
   } catch (error) {
-    sendLog(`✗ Critical error: ${error.message}`, 'red');
-    sendLog(error.stack, 'red');
-    sendEvent({ type: 'error', message: error.message });
+    // Log sanitized error to client
+    const sanitizedMessage = error.message.replace(/\/[\w\/\-\.]+/g, '[path]');
+    sendLog(`✗ Critical error: ${sanitizedMessage}`, 'red');
+    sendEvent({
+      type: 'error',
+      message: sanitizedMessage
+    });
+
+    // Log full error server-side
+    console.error('[PDF Controller Error]', error);
   } finally {
+    // Always clean up uploaded file
     if (pdfPath) {
       fs.unlink(pdfPath, (err) => {
-        if (err) sendLog(`⚠ Could not delete temp file: ${err.message}`, 'orange');
+        if (err) {
+          console.error(`[Cleanup] Could not delete temp file: ${err.message}`);
+        }
       });
     }
 
-    // Cerrar conexión SSE
     if (!res.writableEnded) res.end();
   }
 }
 
-// Export default con ambas funciones
-export default { processPDF, upload };
+export default {
+  processPDF,
+  upload
+};

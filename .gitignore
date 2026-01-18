@@ -27,6 +27,10 @@ Thumbs.db
 # Claude AI files
 .claude/
 
+# Kilo Code
+.kilocode/
+.kilocode/*
+
 # Temporary files
 *.tmp
 .cache/

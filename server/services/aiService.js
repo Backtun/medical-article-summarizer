@@ -1,14 +1,29 @@
 /**
- * AI Service - OpenRouter Integration
+ * AI Service - OpenRouter Integration (v2 - Anti-Hallucination)
  *
  * Este servicio encapsula toda la lógica de comunicación con OpenRouter.
- * Implementa el patrón de agnosticismo de modelo permitiendo cambiar
- * entre GPT-4o, Claude, Llama, etc. solo modificando variables de entorno.
+ * Implementa:
+ * - Prompts anti-alucinación con formato JSON estructurado
+ * - Validación de respuestas
+ * - Tracking de tokens para control de costos
  */
 
 import OpenAI from 'openai';
 import '../config/env.js';
-import { PAGE_ANALYSIS_PROMPT, SUMMARY_GENERATION_PROMPT } from '../utils/prompts.js';
+
+// Import both prompt versions - v2 preferred
+import {
+  PAGE_ANALYSIS_PROMPT,
+  SUMMARY_GENERATION_PROMPT
+} from '../utils/prompts.js';
+import {
+  IMRYD_EXTRACTION_PROMPT,
+  PAGE_ANALYSIS_PROMPT_V2,
+  validateIMRyDResponse
+} from '../utils/prompts.v2.js';
+
+// Use v2 prompts if USE_PROMPTS_V2 is set
+const USE_V2_PROMPTS = process.env.USE_PROMPTS_V2 === 'true';
 
 // Configuración del cliente OpenRouter
 const client = new OpenAI({
@@ -16,9 +31,60 @@ const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
   defaultHeaders: {
     'HTTP-Referer': process.env.SITE_URL || 'http://localhost:5173',
-    'X-Title': process.env.SITE_NAME || 'Medical Summarizer',
-  },
+    'X-Title': process.env.SITE_NAME || 'Medical Summarizer'
+  }
 });
+
+// Token tracking for cost estimation
+let sessionTokens = {
+  prompt: 0,
+  completion: 0,
+  total: 0
+};
+
+/**
+ * Estimate tokens in a string (rough approximation)
+ * @param {string} text - Text to estimate
+ * @returns {number} - Estimated token count
+ */
+function estimateTokens(text) {
+  if (!text) return 0;
+  // Rough estimate: ~4 characters per token for English/Spanish
+  return Math.ceil(text.length / 4);
+}
+
+/**
+ * Update token tracking from API response
+ * @param {Object} usage - Usage object from API response
+ */
+function trackTokenUsage(usage) {
+  if (usage) {
+    sessionTokens.prompt += usage.prompt_tokens || 0;
+    sessionTokens.completion += usage.completion_tokens || 0;
+    sessionTokens.total += usage.total_tokens || 0;
+  }
+}
+
+/**
+ * Get current session token usage
+ * @returns {Object} - Token usage statistics
+ */
+export function getTokenUsage() {
+  return {
+    ...sessionTokens
+  };
+}
+
+/**
+ * Reset token tracking
+ */
+export function resetTokenUsage() {
+  sessionTokens = {
+    prompt: 0,
+    completion: 0,
+    total: 0
+  };
+}
 
 /**
  * Envía un análisis de página a la IA
@@ -37,15 +103,18 @@ export async function analyzePage(pageText, pageNumber, onLog) {
     throw new Error('Missing OPENAI_API_KEY. Configure it in .env.');
   }
 
+  // Select prompt based on configuration
+  const systemPrompt = USE_V2_PROMPTS ? PAGE_ANALYSIS_PROMPT_V2 : PAGE_ANALYSIS_PROMPT;
+
   try {
-    log(`🤖 Analyzing page ${pageNumber} with ${model}...`, 'cyan');
+    const estimatedInputTokens = estimateTokens(systemPrompt) + estimateTokens(pageText);
+    log(`🤖 Analyzing page ${pageNumber} (~${estimatedInputTokens} tokens)...`, 'cyan');
 
     const response = await client.chat.completions.create({
       model: model,
-      messages: [
-        {
+      messages: [{
           role: 'system',
-          content: PAGE_ANALYSIS_PROMPT
+          content: systemPrompt
         },
         {
           role: 'user',
@@ -53,8 +122,11 @@ export async function analyzePage(pageText, pageNumber, onLog) {
         }
       ],
       temperature: 0.3,
-      max_tokens: 4000,
+      max_tokens: 4000
     });
+
+    // Track token usage
+    trackTokenUsage(response.usage);
 
     const analysis = response.choices[0].message.content;
 
@@ -84,38 +156,84 @@ export async function generateSummary(title, analyzedPages, onLog) {
     throw new Error('Missing OPENAI_API_KEY. Configure it in .env.');
   }
 
+  // Select prompt based on configuration
+  const systemPrompt = USE_V2_PROMPTS ?
+    IMRYD_EXTRACTION_PROMPT :
+    SUMMARY_GENERATION_PROMPT.replace('{title}', title);
+
   try {
     log('📝 Generating structured summary (IMRyD format)...', 'yellow');
 
-    // Combinar análisis de páginas - extraer la propiedad .analysis de cada objeto
+    // Combine page analyses
     const combinedAnalysis = analyzedPages
       .map(page => `--- PÁGINA ${page.pageNumber} ---\n${page.analysis}`)
       .join('\n\n');
 
-    // También incluir texto original como referencia
+    // Include original text as reference (limited to avoid token overflow)
     const combinedText = analyzedPages
       .map(page => `=== PÁGINA ${page.pageNumber} ===\n${page.text}`)
       .join('\n\n---\n\n');
 
+    // Limit text to avoid token limits
+    const maxTextLength = 15000;
+    const truncatedText = combinedText.length > maxTextLength ?
+      combinedText.substring(0, maxTextLength) + '\n\n[... texto truncado por límite de tokens ...]' :
+      combinedText;
+
+    const estimatedInputTokens = estimateTokens(systemPrompt) + estimateTokens(combinedAnalysis) + estimateTokens(truncatedText);
+    log(`📊 Estimated input: ~${estimatedInputTokens} tokens`, 'gray');
+
     const response = await client.chat.completions.create({
       model: model,
-      messages: [
-        {
+      messages: [{
           role: 'system',
-          content: SUMMARY_GENERATION_PROMPT.replace('{title}', title)
+          content: systemPrompt
         },
         {
           role: 'user',
-          content: `=== ANÁLISIS DEL DOCUMENTO ===\n\n${combinedAnalysis}\n\n\n=== TEXTO ORIGINAL DEL DOCUMENTO ===\n\n${combinedText.substring(0, 15000)}`
+          content: USE_V2_PROMPTS ?
+            `TÍTULO DEL DOCUMENTO: ${title}\n\n=== ANÁLISIS DEL DOCUMENTO ===\n\n${combinedAnalysis}\n\n\n=== TEXTO ORIGINAL DEL DOCUMENTO ===\n\n${truncatedText}` :
+            `=== ANÁLISIS DEL DOCUMENTO ===\n\n${combinedAnalysis}\n\n\n=== TEXTO ORIGINAL DEL DOCUMENTO ===\n\n${truncatedText}`
         }
       ],
       temperature: 0.5,
-      max_tokens: 8000,
+      max_tokens: 8000
     });
 
-    const summary = response.choices[0].message.content;
+    // Track token usage
+    trackTokenUsage(response.usage);
+
+    let summary = response.choices[0].message.content;
+
+    // If using v2 prompts, try to parse and validate JSON
+    if (USE_V2_PROMPTS) {
+      try {
+        // Extract JSON from response if wrapped in code blocks
+        const jsonMatch = summary.match(/```json\s*([\s\S]*?)\s*```/) ||
+          summary.match(/```\s*([\s\S]*?)\s*```/);
+        const jsonStr = jsonMatch ? jsonMatch[1] : summary;
+
+        const parsed = JSON.parse(jsonStr);
+        const validation = validateIMRyDResponse(parsed);
+
+        if (!validation.valid) {
+          log(`⚠ JSON validation warnings: ${validation.errors.join(', ')}`, 'orange');
+        }
+
+        // Convert JSON back to Markdown for display
+        summary = convertIMRyDToMarkdown(parsed);
+        log('✓ Structured summary validated', 'green');
+      } catch (parseError) {
+        // If JSON parsing fails, fall back to raw response
+        log('⚠ Could not parse structured response, using raw output', 'orange');
+      }
+    }
 
     log(`✓ Summary generated (${summary.length} chars)`, 'green');
+
+    // Log session token usage
+    const usage = getTokenUsage();
+    log(`📊 Session tokens: ${usage.total} total (${usage.prompt} input, ${usage.completion} output)`, 'gray');
 
     return summary;
   } catch (error) {
@@ -124,7 +242,116 @@ export async function generateSummary(title, analyzedPages, onLog) {
   }
 }
 
+/**
+ * Convert structured IMRyD JSON to Markdown format
+ * @param {Object} imryd - Parsed IMRyD JSON object
+ * @returns {string} - Formatted Markdown
+ */
+function convertIMRyDToMarkdown(imryd) {
+  if (imryd.error) {
+    return `# ⚠️ Error\n\n${imryd.error}\n\n${imryd.sugerencia || ''}`;
+  }
+
+  let md = '';
+
+  // Title and metadata
+  md += `# ${imryd.metadata?.titulo || 'Documento Médico'}\n\n`;
+
+  if (imryd.metadata) {
+    md += '## 📋 Metadatos\n\n';
+    if (imryd.metadata.autores && imryd.metadata.autores !== 'No especificado en el documento') {
+      md += `- **Autores:** ${Array.isArray(imryd.metadata.autores) ? imryd.metadata.autores.join(', ') : imryd.metadata.autores}\n`;
+    }
+    if (imryd.metadata.fecha_publicacion && imryd.metadata.fecha_publicacion !== 'No especificado en el documento') {
+      md += `- **Fecha:** ${imryd.metadata.fecha_publicacion}\n`;
+    }
+    if (imryd.metadata.tipo_estudio && imryd.metadata.tipo_estudio !== 'No especificado en el documento') {
+      md += `- **Tipo de estudio:** ${imryd.metadata.tipo_estudio}\n`;
+    }
+    if (imryd.metadata.doi && imryd.metadata.doi !== 'No especificado en el documento') {
+      md += `- **DOI:** ${imryd.metadata.doi}\n`;
+    }
+    md += '\n';
+  }
+
+  // Introduction
+  if (imryd.introduccion) {
+    md += '## 📖 Introducción\n\n';
+    md += `${imryd.introduccion.contexto || ''}\n\n`;
+    if (imryd.introduccion.objetivo_principal) {
+      md += `**Objetivo:** ${imryd.introduccion.objetivo_principal}\n\n`;
+    }
+  }
+
+  // Methods
+  if (imryd.metodos) {
+    md += '## 🔬 Métodos\n\n';
+    if (imryd.metodos.diseno) md += `**Diseño:** ${imryd.metodos.diseno}\n\n`;
+    if (imryd.metodos.poblacion && imryd.metodos.poblacion !== 'No especificado en el documento') {
+      md += `**Población:** ${imryd.metodos.poblacion}\n\n`;
+    }
+    if (imryd.metodos.tamano_muestra && imryd.metodos.tamano_muestra !== 'No especificado en el documento') {
+      md += `**Tamaño de muestra:** ${imryd.metodos.tamano_muestra}\n\n`;
+    }
+  }
+
+  // Results
+  if (imryd.resultados) {
+    md += '## 📊 Resultados\n\n';
+    if (imryd.resultados.hallazgos_principales && Array.isArray(imryd.resultados.hallazgos_principales)) {
+      imryd.resultados.hallazgos_principales.forEach((hallazgo, i) => {
+        md += `### Hallazgo ${i + 1}\n`;
+        md += `${hallazgo.descripcion || hallazgo}\n`;
+        if (hallazgo.valor) md += `- **Valor:** ${hallazgo.valor}\n`;
+        if (hallazgo.valor_p) md += `- **p-valor:** ${hallazgo.valor_p}\n`;
+        md += '\n';
+      });
+    }
+  }
+
+  // Discussion
+  if (imryd.discusion) {
+    md += '## 💬 Discusión\n\n';
+    md += `${imryd.discusion.interpretacion || ''}\n\n`;
+    if (imryd.discusion.limitaciones && imryd.discusion.limitaciones !== 'No especificado en el documento') {
+      md += '### Limitaciones\n';
+      if (Array.isArray(imryd.discusion.limitaciones)) {
+        imryd.discusion.limitaciones.forEach(lim => md += `- ${lim}\n`);
+      } else {
+        md += `${imryd.discusion.limitaciones}\n`;
+      }
+      md += '\n';
+    }
+  }
+
+  // Key points
+  if (imryd.puntos_clave && Array.isArray(imryd.puntos_clave)) {
+    md += '## 💡 Puntos Clave\n\n';
+    imryd.puntos_clave.forEach(punto => md += `- ${punto}\n`);
+    md += '\n';
+  }
+
+  // Warnings/Disclaimers
+  if (imryd.advertencias && Array.isArray(imryd.advertencias)) {
+    md += '## ⚠️ Advertencias\n\n';
+    imryd.advertencias.forEach(adv => md += `> ${adv}\n>\n`);
+    md += '\n';
+  }
+
+  // Quality score
+  if (imryd.calidad_extraccion) {
+    md += `---\n\n*Confianza de extracción: ${Math.round((imryd.calidad_extraccion.score || 0) * 100)}%*\n`;
+    if (imryd.calidad_extraccion.notas) {
+      md += `\n*Notas: ${imryd.calidad_extraccion.notas}*\n`;
+    }
+  }
+
+  return md;
+}
+
 export default {
   analyzePage,
-  generateSummary
+  generateSummary,
+  getTokenUsage,
+  resetTokenUsage
 };

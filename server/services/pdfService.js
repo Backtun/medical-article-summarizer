@@ -25,7 +25,9 @@ export async function extractTextFromPDF(pdfPath, onLog) {
     const dataBuffer = fs.readFileSync(pdfPath);
     const pageTexts = [];
     const renderPage = (pageData) =>
-      pageData.getTextContent({ normalizeWhitespace: true }).then((textContent) => {
+      pageData.getTextContent({
+        normalizeWhitespace: true
+      }).then((textContent) => {
         let lastY = null;
         let text = '';
 
@@ -48,7 +50,9 @@ export async function extractTextFromPDF(pdfPath, onLog) {
         return text;
       });
 
-    const pdfData = await pdf(dataBuffer, { pagerender: renderPage });
+    const pdfData = await pdf(dataBuffer, {
+      pagerender: renderPage
+    });
 
     log(`✓ PDF loaded: ${pdfData.numpages} pages detected`, 'green');
 
@@ -102,7 +106,9 @@ export function splitIntoPages(fullText, numPages) {
 
   // Si no hay texto o número de páginas inválido
   if (!fullText || fullText.trim().length === 0) {
-    return Array.from({ length: numPages }, (_, i) => ({
+    return Array.from({
+      length: numPages
+    }, (_, i) => ({
       pageNumber: i + 1,
       text: '[Página vacía - sin texto extraíble]'
     }));
@@ -130,10 +136,22 @@ export function splitIntoPages(fullText, numPages) {
 }
 
 /**
- * Detecta la estructura del documento buscando patrones Part/Chapter/Section
+ * IMRyD section patterns for medical articles
+ */
+const IMRYD_PATTERNS = {
+  abstract: /^(?:\d+[\.\s]*)?(?:ABSTRACT|Abstract|Resumen|RESUMEN|Summary)\s*$/im,
+  introduction: /^(?:\d+[\.\s]*)?(?:INTRODUCTION|Introduction|Introducción|INTRODUCCIÓN|Background|BACKGROUND)\s*$/im,
+  methods: /^(?:\d+[\.\s]*)?(?:METHODS?|Methods?|METHODOLOGY|Methodology|Metodolog[íi]a|METODOLOG[ÍI]A|Materials?\s+and\s+Methods?|MATERIALS?\s+AND\s+METHODS?|Patients?\s+and\s+Methods?)\s*$/im,
+  results: /^(?:\d+[\.\s]*)?(?:RESULTS?|Results?|Resultados?|RESULTADOS?|Findings?|FINDINGS?)\s*$/im,
+  discussion: /^(?:\d+[\.\s]*)?(?:DISCUSSION|Discussion|Discusión|DISCUSIÓN|CONCLUSIONS?|Conclusions?|Conclusiones?)\s*$/im,
+  references: /^(?:\d+[\.\s]*)?(?:REFERENCES?|References?|Referencias?|REFERENCIAS?|Bibliography|BIBLIOGRAPHY|Bibliograf[íi]a)\s*$/im
+};
+
+/**
+ * Detecta la estructura del documento buscando patrones IMRyD y Part/Chapter/Section
  * @param {Array} pages - Array de páginas con texto
  * @param {Function} onLog - Callback para logs
- * @returns {Object} - Estructura detectada { parts, chapters }
+ * @returns {Object} - Estructura detectada { parts, chapters, imryd }
  */
 export function detectStructure(pages, onLog) {
   const log = (message, color = 'white') => {
@@ -145,7 +163,16 @@ export function detectStructure(pages, onLog) {
   const structure = {
     parts: [],
     chapters: [],
-    sections: []
+    sections: [],
+    imryd: {
+      abstract: null,
+      introduction: null,
+      methods: null,
+      results: null,
+      discussion: null,
+      references: null
+    },
+    isIMRyDFormat: false
   };
 
   const partPattern = /^\s*(?:Part|Parte|PART)\s+([IVX0-9]+(?:\.[0-9]+)?)[\s:.-]*(.*)$/im;
@@ -154,13 +181,20 @@ export function detectStructure(pages, onLog) {
   let currentPart = null;
   let currentChapter = null;
 
-  // Primera pasada: detectar partes y capítulos
+  // Analyze all pages
   for (const page of pages) {
-    const lines = page.text.split('\n').slice(0, 10);
+    const lines = page.text.split('\n');
 
-    for (const line of lines) {
-      const partMatch = line.match(partPattern);
-      const chapterMatch = line.match(chapterPattern);
+    // Check first 20 lines for section headers
+    const headerLines = lines.slice(0, 20);
+
+    for (const line of headerLines) {
+      const trimmedLine = line.trim();
+      if (!trimmedLine) continue;
+
+      // Check for Part/Chapter structure
+      const partMatch = trimmedLine.match(partPattern);
+      const chapterMatch = trimmedLine.match(chapterPattern);
 
       if (partMatch) {
         currentPart = {
@@ -186,18 +220,42 @@ export function detectStructure(pages, onLog) {
         structure.chapters.push(currentChapter);
         log(`    📂 Detected: ${currentChapter.title}`, 'blue');
       }
+
+      // Check for IMRyD sections
+      for (const [sectionName, pattern] of Object.entries(IMRYD_PATTERNS)) {
+        if (pattern.test(trimmedLine) && !structure.imryd[sectionName]) {
+          structure.imryd[sectionName] = {
+            startPage: page.pageNumber,
+            title: trimmedLine,
+            detected: true
+          };
+          log(`  🔬 IMRyD Section: ${sectionName.toUpperCase()} (page ${page.pageNumber})`, 'cyan');
+        }
+      }
     }
   }
 
-  // Si no se detectó estructura, crear una por defecto
+  // Determine if document follows IMRyD format
+  const imrydSections = ['introduction', 'methods', 'results', 'discussion'];
+  const detectedImrydCount = imrydSections.filter(s => structure.imryd[s]).length;
+  structure.isIMRyDFormat = detectedImrydCount >= 2; // At least 2 of the 4 main sections
+
+  // If no part structure detected, create default
   if (structure.parts.length === 0) {
     structure.parts.push({
       id: 'part-1',
       number: '1',
-      title: 'Documento Completo',
+      title: structure.isIMRyDFormat ? 'Artículo Médico' : 'Documento Completo',
       startPage: 1,
       chapters: []
     });
+  }
+
+  // Summary log
+  if (structure.isIMRyDFormat) {
+    log(`✓ IMRyD format detected (${detectedImrydCount}/4 sections)`, 'green');
+  } else {
+    log(`⚠ Standard IMRyD format not detected (${detectedImrydCount}/4 sections)`, 'orange');
   }
 
   log(`✓ Structure analysis: ${structure.parts.length} parts, ${structure.chapters.length} chapters`, 'green');
@@ -205,8 +263,45 @@ export function detectStructure(pages, onLog) {
   return structure;
 }
 
+/**
+ * Removes common headers/footers from page text
+ * @param {string} text - Page text
+ * @param {number} pageNumber - Current page number
+ * @returns {string} - Cleaned text
+ */
+export function cleanPageText(text, pageNumber) {
+  if (!text) return '';
+
+  let cleaned = text;
+
+  // Remove common header/footer patterns
+  const patterns = [
+    // Page numbers
+    /^[\s]*[-–—]?\s*\d+\s*[-–—]?[\s]*$/gm,
+    /^[\s]*Page\s+\d+[\s]*$/gim,
+    /^[\s]*Página\s+\d+[\s]*$/gim,
+    // Common journal headers (generic)
+    /^[\s]*©\s*\d{4}.*$/gm,
+    /^[\s]*Copyright\s+.*$/gim,
+    // DOI patterns often repeated
+    /^[\s]*https?:\/\/doi\.org\/.*$/gm,
+    // Empty lines and whitespace runs
+    /^\s*$/gm
+  ];
+
+  for (const pattern of patterns) {
+    cleaned = cleaned.replace(pattern, '');
+  }
+
+  // Collapse multiple newlines
+  cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
+
+  return cleaned.trim();
+}
+
 export default {
   extractTextFromPDF,
   splitIntoPages,
-  detectStructure
+  detectStructure,
+  cleanPageText
 };

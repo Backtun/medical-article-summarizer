@@ -56,6 +56,58 @@
   color: var(--color-text-secondary);
 }
 
+/* Actions Bar (Export + Disclaimer) */
+.viewer-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  background: var(--color-bg-tertiary);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+}
+
+.viewer-disclaimer {
+  font-size: 0.8rem;
+  color: var(--color-warning);
+  font-weight: 500;
+}
+
+/* Export Buttons */
+.export-buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.export-btn {
+  background: var(--color-bg-secondary);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.export-btn:hover {
+  background: var(--color-bg-tertiary);
+  border-color: var(--color-primary);
+}
+
+.export-btn--md:hover {
+  color: #4fc3f7;
+}
+
+.export-btn--json:hover {
+  color: #81c784;
+}
+
 /* Content Layout */
 .viewer-content {
   display: grid;
@@ -146,8 +198,8 @@
   align-items: center;
   justify-content: space-between;
   padding: 1rem 1.5rem;
-  border-bottom solid var(--color-border);
-  background: 1px: var(--color-bg-tertiary);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg-tertiary);
 }
 
 .content-header h3 {
@@ -249,5 +301,10 @@
 
   .viewer-sidebar {
     max-height: 300px;
+  }
+
+  .viewer-actions {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
