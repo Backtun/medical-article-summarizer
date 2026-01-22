@@ -29,6 +29,7 @@ import pdfService from '../services/pdfService.js';
 import aiService from '../services/aiService.js';
 import structureService from '../services/structureService.js';
 import pdfValidator from '../utils/pdfValidator.js';
+import referenceDetector from '../utils/referenceDetector.js';
 
 const __dirname = path.dirname(fileURLToPath(
   import.meta.url));
@@ -257,23 +258,140 @@ export async function processPDF(req, res) {
 
       try {
         const trimmed = (page.text && page.text.trim) ? page.text.trim() : '';
+
+        // Check for empty or placeholder pages
         if (!trimmed || trimmed.startsWith('[Página')) {
           analyzedPages.push({
             pageNumber: page.pageNumber,
             analysis: '[Página omitida: sin texto extraíble]',
-            text: ''
+            text: '',
+            isEmptyPage: true
           });
           sendLog(`⚠ Page ${page.pageNumber} skipped (no extractable text)`, 'orange');
-        } else {
-          // Sanitize text before sending to AI (basic prompt injection protection)
-          const sanitizedText = pdfValidator.sanitizeTextForPrompt(page.text);
-          const analysis = await aiService.analyzePage(sanitizedText, page.pageNumber, sendLog);
-          analyzedPages.push({
-            pageNumber: page.pageNumber,
-            analysis,
-            text: page.text.substring(0, 500) // Preview only
-          });
+          continue;
         }
+
+        // LAYER 1: Intelligent Content Analysis with Tripartite Classification
+        // Detects: PURE_REFERENCES, MIXED_CONTENT, or SUBSTANTIVE_CONTENT
+        const contentAnalysis = referenceDetector.analyzePageContent(trimmed, page.pageNumber);
+
+        // Handle based on classification
+        switch (contentAnalysis.classification) {
+          case referenceDetector.PAGE_CLASSIFICATION.PURE_REFERENCES: {
+            // Pure references page - skip AI entirely to prevent hallucination
+            const referenceResponse = referenceDetector.generateReferencePageResponse(
+              page.pageNumber,
+              contentAnalysis
+            );
+
+            analyzedPages.push({
+              pageNumber: page.pageNumber,
+              analysis: referenceResponse,
+              text: page.text.substring(0, 500),
+              isReferencePage: true,
+              contentClassification: contentAnalysis.classification,
+              referenceDetection: {
+                confidence: contentAnalysis.confidence,
+                reasons: contentAnalysis.reasons,
+                stats: contentAnalysis.refStats
+              }
+            });
+
+            sendLog(
+              `📚 Page ${page.pageNumber} detected as pure references (${Math.round(contentAnalysis.confidence * 100)}% confidence) - skipping AI`,
+              'yellow'
+            );
+            continue;
+          }
+
+          case referenceDetector.PAGE_CLASSIFICATION.MIXED_CONTENT: {
+            // Mixed content: has important sections (Conclusion, Limitations, etc.) + References
+            // Extract and process ONLY the substantive content, ignoring references section
+
+            const extractedText = contentAnalysis.extractableText;
+            const sectionsFound = contentAnalysis.importantSections.map(s => s.name).join(', ');
+
+            sendLog(
+              `🔀 Page ${page.pageNumber} is mixed content (${sectionsFound}) - extracting substantive content`,
+              'cyan'
+            );
+
+            // Verify extracted content is worth processing
+            if (extractedText.length < 100) {
+              analyzedPages.push({
+                pageNumber: page.pageNumber,
+                analysis: `[Página omitida: contenido extraído insuficiente (${extractedText.length} caracteres)]`,
+                text: page.text.substring(0, 500),
+                isLowContent: true,
+                contentClassification: contentAnalysis.classification
+              });
+              sendLog(`⚠ Page ${page.pageNumber} skipped (extracted content too short)`, 'orange');
+              continue;
+            }
+
+            // Sanitize and process only the extracted substantive content
+            const sanitizedText = pdfValidator.sanitizeTextForPrompt(extractedText);
+            const analysis = await aiService.analyzePage(sanitizedText, page.pageNumber, sendLog);
+
+            // Add note about mixed content processing
+            const mixedContentNote = referenceDetector.generateMixedContentResponse(
+              page.pageNumber,
+              contentAnalysis
+            );
+
+            analyzedPages.push({
+              pageNumber: page.pageNumber,
+              analysis: analysis,
+              text: extractedText.substring(0, 500),
+              contentClassification: contentAnalysis.classification,
+              mixedContentInfo: {
+                sectionsFound: contentAnalysis.importantSections,
+                originalLength: page.text.length,
+                extractedLength: extractedText.length,
+                note: mixedContentNote
+              }
+            });
+
+            sendLog(
+              `✓ Page ${page.pageNumber} processed: ${extractedText.length}/${page.text.length} chars (references excluded)`,
+              'green'
+            );
+            continue;
+          }
+
+          case referenceDetector.PAGE_CLASSIFICATION.SUBSTANTIVE_CONTENT:
+          default: {
+            // Normal substantive content - process fully
+
+            // LAYER 2: Additional check for substantive content quality
+            const contentCheck = referenceDetector.hasSubstantiveContent(trimmed);
+
+            if (!contentCheck.hasContent) {
+              analyzedPages.push({
+                pageNumber: page.pageNumber,
+                analysis: `[Página omitida: ${contentCheck.reason}]`,
+                text: page.text.substring(0, 500),
+                isLowContent: true,
+                contentClassification: contentAnalysis.classification
+              });
+              sendLog(`⚠ Page ${page.pageNumber} skipped (${contentCheck.reason})`, 'orange');
+              continue;
+            }
+
+            // Page has substantive content - send to AI for analysis
+            // Sanitize text before sending to AI (basic prompt injection protection)
+            const sanitizedText = pdfValidator.sanitizeTextForPrompt(page.text);
+            const analysis = await aiService.analyzePage(sanitizedText, page.pageNumber, sendLog);
+
+            analyzedPages.push({
+              pageNumber: page.pageNumber,
+              analysis,
+              text: page.text.substring(0, 500),
+              contentClassification: contentAnalysis.classification
+            });
+          }
+        }
+
       } catch (error) {
         sendLog(`⚠ Skipping page ${page.pageNumber} due to error`, 'orange');
         analyzedPages.push({

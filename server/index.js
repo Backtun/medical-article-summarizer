@@ -117,7 +117,7 @@ app.get('/api/health', async (req, res) => {
     timestamp: new Date().toISOString(),
     version: '1.0.0',
     services: {
-      openrouter: process.env.OPENAI_API_KEY ? 'configured' : 'not_configured',
+      chutes: process.env.CHUTES_API_KEY ? 'configured' : 'not_configured',
       ollama: ollamaStatus
     }
   });
@@ -271,12 +271,12 @@ app.listen(PORT, () => {
   console.log('='.repeat(50));
   console.log(`📍 URL: http://localhost:${PORT}`);
   console.log(`🌍 Environment: ${IS_PRODUCTION ? 'production' : 'development'}`);
-  console.log(`🤖 Model: ${process.env.MODEL || 'nvidia/nemotron-3-nano-30b-a3b:free'}`);
+  console.log(`🤖 Model: ${process.env.MODEL || 'zai-org/GLM-4.7-TEE'}`);
 
-  if (!process.env.OPENAI_API_KEY) {
-    console.warn('⚠️  Missing OPENAI_API_KEY. The API will fail until it is set.');
+  if (!process.env.CHUTES_API_KEY) {
+    console.warn('⚠️  Missing CHUTES_API_KEY. The API will fail until it is set.');
   } else {
-    console.log('✅ API Key configured');
+    console.log('✅ Chutes AI Key configured');
   }
 
   console.log('='.repeat(50));

@@ -1,7 +1,7 @@
 /**
- * AI Service - OpenRouter Integration (v2 - Anti-Hallucination)
+ * AI Service - Chutes AI Integration (v2 - Anti-Hallucination)
  *
- * Este servicio encapsula toda la lógica de comunicación con OpenRouter.
+ * Este servicio encapsula toda la lógica de comunicación con Chutes AI.
  * Implementa:
  * - Prompts anti-alucinación con formato JSON estructurado
  * - Validación de respuestas
@@ -11,24 +11,22 @@
 import OpenAI from 'openai';
 import '../config/env.js';
 
-// Import both prompt versions - v2 preferred
+// Import all prompts from consolidated module
 import {
   PAGE_ANALYSIS_PROMPT,
-  SUMMARY_GENERATION_PROMPT
-} from '../utils/prompts.js';
-import {
-  IMRYD_EXTRACTION_PROMPT,
+  SUMMARY_GENERATION_PROMPT,
   PAGE_ANALYSIS_PROMPT_V2,
+  IMRYD_EXTRACTION_PROMPT,
   validateIMRyDResponse
-} from '../utils/prompts.v2.js';
+} from '../utils/prompts.js';
 
 // Use v2 prompts if USE_PROMPTS_V2 is set
 const USE_V2_PROMPTS = process.env.USE_PROMPTS_V2 === 'true';
 
-// Configuración del cliente OpenRouter
+// Configuración del cliente Chutes AI
 const client = new OpenAI({
-  baseURL: 'https://openrouter.ai/api/v1',
-  apiKey: process.env.OPENAI_API_KEY,
+  baseURL: 'https://llm.chutes.ai/v1',
+  apiKey: process.env.CHUTES_API_KEY,
   defaultHeaders: {
     'HTTP-Referer': process.env.SITE_URL || 'http://localhost:5173',
     'X-Title': process.env.SITE_NAME || 'Medical Summarizer'
@@ -99,8 +97,8 @@ export async function analyzePage(pageText, pageNumber, onLog) {
     if (onLog) onLog(message, color);
   };
 
-  if (!process.env.OPENAI_API_KEY) {
-    throw new Error('Missing OPENAI_API_KEY. Configure it in .env.');
+  if (!process.env.CHUTES_API_KEY) {
+    throw new Error('Missing CHUTES_API_KEY. Configure it in .env.');
   }
 
   // Select prompt based on configuration
@@ -152,8 +150,8 @@ export async function generateSummary(title, analyzedPages, onLog) {
     if (onLog) onLog(message, color);
   };
 
-  if (!process.env.OPENAI_API_KEY) {
-    throw new Error('Missing OPENAI_API_KEY. Configure it in .env.');
+  if (!process.env.CHUTES_API_KEY) {
+    throw new Error('Missing CHUTES_API_KEY. Configure it in .env.');
   }
 
   // Select prompt based on configuration
@@ -192,8 +190,7 @@ export async function generateSummary(title, analyzedPages, onLog) {
         {
           role: 'user',
           content: USE_V2_PROMPTS ?
-            `TÍTULO DEL DOCUMENTO: ${title}\n\n=== ANÁLISIS DEL DOCUMENTO ===\n\n${combinedAnalysis}\n\n\n=== TEXTO ORIGINAL DEL DOCUMENTO ===\n\n${truncatedText}` :
-            `=== ANÁLISIS DEL DOCUMENTO ===\n\n${combinedAnalysis}\n\n\n=== TEXTO ORIGINAL DEL DOCUMENTO ===\n\n${truncatedText}`
+            `TÍTULO DEL DOCUMENTO: ${title}\n\n=== ANÁLISIS DEL DOCUMENTO ===\n\n${combinedAnalysis}\n\n\n=== TEXTO ORIGINAL DEL DOCUMENTO ===\n\n${truncatedText}` : `=== ANÁLISIS DEL DOCUMENTO ===\n\n${combinedAnalysis}\n\n\n=== TEXTO ORIGINAL DEL DOCUMENTO ===\n\n${truncatedText}`
         }
       ],
       temperature: 0.5,

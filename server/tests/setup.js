@@ -6,7 +6,7 @@
 
 // Set test environment
 process.env.NODE_ENV = 'test';
-process.env.OPENAI_API_KEY = 'test-key-not-real';
+process.env.CHUTES_API_KEY = 'test-key-not-real';
 process.env.MODEL = 'test-model';
 process.env.MAX_PAGES = '50';
 process.env.PARSING_TIMEOUT_MS = '5000';
