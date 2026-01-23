@@ -138,10 +138,10 @@ export async function analyzePage(pageText, pageNumber, onLog) {
 
   const available = await isOllamaAvailable();
   if (!available) {
-    throw new Error('Ollama is not running. Start it with: ollama serve');
+    throw new Error('Ollama no está ejecutándose. Inícialo con: ollama serve');
   }
 
-  log(`🦙 Analyzing page ${pageNumber} with Ollama (${OLLAMA_MODEL})...`, 'cyan');
+  log(`🦙 Analizando página ${pageNumber} con Ollama (${OLLAMA_MODEL})...`, 'cyan');
 
   const systemPrompt = `Eres un asistente médico experto. Analiza el siguiente texto de un artículo médico y extrae los puntos clave.
 Sé preciso y cita solo lo que aparece en el texto. Si algo no está claro, indícalo.
@@ -157,7 +157,7 @@ Responde en español.`;
     }
   ]);
 
-  log(`✓ Page ${pageNumber} analyzed with Ollama (${analysis.length} chars)`, 'green');
+  log(`✓ Página ${pageNumber} analizada con Ollama (${analysis.length} caracteres)`, 'green');
   return analysis;
 }
 
@@ -201,7 +201,7 @@ IMPORTANTE:
     }
   ]);
 
-  log(`✓ Summary generated with Ollama (${summary.length} chars)`, 'green');
+  log(`✓ Resumen generado con Ollama (${summary.length} caracteres)`, 'green');
 
   // Add disclaimer
   return summary + `

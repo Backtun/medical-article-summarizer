@@ -171,8 +171,8 @@ export function apiKeyAuth(options = {}) {
     if (!apiKey) {
       if (required) {
         return res.status(401).json({
-          error: 'Unauthorized',
-          message: 'API key required. Provide via X-API-Key header or api_key query parameter.'
+          error: 'No autorizado',
+          message: 'Se requiere clave API. Proporciona via encabezado X-API-Key o parámetro api_key.'
         });
       }
       // No key, use default limits
@@ -185,8 +185,8 @@ export function apiKeyAuth(options = {}) {
 
     if (!keyData) {
       return res.status(401).json({
-        error: 'Unauthorized',
-        message: 'Invalid or revoked API key.'
+        error: 'No autorizado',
+        message: 'Clave API inválida o revocada.'
       });
     }
 
@@ -199,8 +199,8 @@ export function apiKeyAuth(options = {}) {
 
     if (!rateCheck.allowed) {
       return res.status(429).json({
-        error: 'Too Many Requests',
-        message: `Rate limit exceeded. Resets at ${rateCheck.resetAt}`,
+        error: 'Demasiadas solicitudes',
+        message: `Límite de solicitudes excedido. Se reinicia a las ${rateCheck.resetAt}`,
         retryAfter: Math.ceil((new Date(rateCheck.resetAt) - Date.now()) / 1000)
       });
     }

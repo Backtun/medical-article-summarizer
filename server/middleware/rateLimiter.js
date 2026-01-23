@@ -19,8 +19,8 @@ class RateLimiter {
     this.windowMs = options.windowMs || 60 * 1000; // 1 minute default
     this.max = options.max || 10; // 10 requests default
     this.message = options.message || {
-      error: 'Too many requests',
-      message: 'Please wait before making another request',
+      error: 'Demasiadas solicitudes',
+      message: 'Por favor espera antes de hacer otra solicitud',
       retryAfter: Math.ceil(this.windowMs / 1000)
     };
     this.requests = new Map();
@@ -89,8 +89,8 @@ const apiLimiterInstance = new RateLimiter({
   windowMs: 60 * 1000, // 1 minute
   max: 30, // 30 requests per minute
   message: {
-    error: 'Too many requests',
-    message: 'You have exceeded the rate limit. Please try again later.',
+    error: 'Demasiadas solicitudes',
+    message: 'Has excedido el límite de solicitudes. Por favor intenta de nuevo más tarde.',
     retryAfter: 60
   }
 });
@@ -100,8 +100,8 @@ const uploadLimiterInstance = new RateLimiter({
   windowMs: 60 * 1000, // 1 minute
   max: 5, // 5 uploads per minute
   message: {
-    error: 'Upload limit reached',
-    message: 'Maximum 5 PDF uploads per minute. Please wait before uploading another file.',
+    error: 'Límite de carga alcanzado',
+    message: 'Máximo 5 cargas de PDF por minuto. Por favor espera antes de subir otro archivo.',
     retryAfter: 60
   }
 });

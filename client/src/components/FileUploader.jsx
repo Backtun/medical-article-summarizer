@@ -21,12 +21,12 @@ function FileUploader({ onProcessStart, disabled }) {
    */
   const validateFile = (file) => {
     if (file.type !== 'application/pdf') {
-      setError('Only PDF files are allowed');
+      setError('Solo se permiten archivos PDF');
       return false;
     }
     // Limite de tamaño: 50MB
     if (file.size > 50 * 1024 * 1024) {
-      setError('File size must be less than 50MB');
+      setError('El archivo debe ser menor a 50MB');
       return false;
     }
     return true;
@@ -173,13 +173,13 @@ function FileUploader({ onProcessStart, disabled }) {
           <div className="drop-content">
             <div className="drop-icon">📁</div>
             <p className="drop-text">
-              Drag & drop your medical PDF here
+              Arrastre y Suelte su PDF médico aquí
             </p>
             <p className="drop-subtext">
-              or click to browse files
+              o haga clic para buscar archivos
             </p>
             <span className="file-restriction">
-              Maximum file size: 50MB
+              Tamaño máximo del archivo: 50MB
             </span>
           </div>
         )}
@@ -200,7 +200,7 @@ function FileUploader({ onProcessStart, disabled }) {
           disabled={disabled}
           type="button"
         >
-          {disabled ? 'Processing...' : 'Analyze with AI'}
+          {disabled ? 'Procesando...' : 'Analizar con IA'}
         </button>
       )}
     </div>

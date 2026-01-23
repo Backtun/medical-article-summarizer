@@ -1,214 +1,215 @@
-# Architecture
+# Arquitectura
 
-## Overview
+## Visión General
 
-Medical Article Summarizer is a MERN-stack application that processes medical PDFs and generates structured IMRyD summaries using AI.
+Medical Article Summarizer es una aplicación MERN-stack que procesa PDFs médicos y genera resúmenes estructurados en formato IMRyD usando IA.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                         Client (React)                          │
+│                         Cliente (React)                          │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐  │
 │  │FileUploader │  │TerminalLog │  │    SummaryViewer       │  │
-│  │   (drag)    │  │   (SSE)    │  │ (Markdown + Tree)      │  │
+│  │   (drag)    │  │   (SSE)    │  │ (Markdown + Árbol)     │  │
 │  └──────┬──────┘  └──────┬──────┘  └───────────┬───────────┘  │
 │         │                │                      │              │
 │         └────────────────┼──────────────────────┘              │
 │                          │                                      │
 │           ┌──────────────▼──────────────┐                      │
 │           │     useProcessing Hook       │                      │
-│           │   (SSE stream handling)      │                      │
+│           │   (manejo de stream SSE)     │                      │
 │           └──────────────┬──────────────┘                      │
 └──────────────────────────┼──────────────────────────────────────┘
                            │ HTTP POST + SSE
                            ▼
 ┌──────────────────────────────────────────────────────────────────┐
-│                       Server (Express)                           │
+│                       Servidor (Express)                          │
 │  ┌──────────────────────────────────────────────────────────┐   │
 │  │                     index.js                              │   │
-│  │  - CORS, JSON parsing                                     │   │
-│  │  - Static file serving (production)                       │   │
-│  │  - Error handling                                         │   │
+│  │  - CORS, parsing JSON                                     │   │
+│  │  - Servir archivos estáticos (producción)                 │   │
+│  │  - Manejo de errores                                      │   │
 │  └────────────────────────────┬─────────────────────────────┘   │
 │                               │                                  │
 │  ┌────────────────────────────▼─────────────────────────────┐   │
 │  │              pdfController.js                             │   │
-│  │  - Multer file upload                                     │   │
-│  │  - SSE stream setup                                       │   │
-│  │  - Pipeline orchestration                                 │   │
+│  │  - Carga de archivos con Multer                           │   │
+│  │  - Configuración de stream SSE                            │   │
+│  │  - Orquestación del pipeline                              │   │
 │  └─────┬─────────────────┬────────────────┬─────────────────┘   │
 │        │                 │                │                      │
 │        ▼                 ▼                ▼                      │
 │  ┌───────────┐    ┌────────────┐   ┌─────────────────┐          │
 │  │pdfService │    │ aiService  │   │structureService│          │
 │  │           │    │            │   │                │          │
-│  │- Extract  │    │- Analyze   │   │- Group pages   │          │
-│  │  text     │    │  pages     │   │- Build tree    │          │
-│  │- Segment  │    │- Generate  │   │                │          │
-│  │  pages    │    │  summary   │   │                │          │
+│  │- Extraer  │    │- Analizar  │   │- Agrupar       │          │
+│  │  texto    │    │  páginas   │   │  páginas       │          │
+│  │- Segmentar│    │- Generar   │   │- Construir     │          │
+│  │  páginas  │    │  resumen   │   │  árbol         │          │
 │  └───────────┘    └─────┬──────┘   └────────────────┘          │
 │                         │                                        │
 └─────────────────────────┼────────────────────────────────────────┘
                           │ HTTPS
                           ▼
                  ┌─────────────────┐
-                 │  OpenRouter API │
-                 │  (LLM Gateway)  │
+                 │  API de IA      │
+                 │  (OpenRouter/   │
+                 │   Ollama)       │
                  └─────────────────┘
 ```
 
-## Data Flow
+## Flujo de Datos
 
-### 1. PDF Upload
+### 1. Carga de PDF
 ```
-User drops PDF → FileUploader validates (type, size) → 
-FormData POST to /api/process → Multer saves to /uploads/
+Usuario arrastra PDF → FileUploader valida (tipo, tamaño) → 
+FormData POST a /api/process → Multer guarda en /uploads/
 ```
 
-### 2. Processing Pipeline
+### 2. Pipeline de Procesamiento
 ```
-pdfController receives file
+pdfController recibe el archivo
     │
     ├─1─► pdfService.extractTextFromPDF()
-    │     └── pdf-parse library → text + pages array
+    │     └── librería pdf-parse → texto + array de páginas
     │
     ├─2─► pdfService.detectStructure()
-    │     └── Regex patterns for Part/Chapter headers
+    │     └── Patrones regex para encabezados de Parte/Capítulo
     │
-    ├─3─► FOR EACH page:
-    │     └── aiService.analyzePage() → OpenRouter API
+    ├─3─► POR CADA página:
+    │     └── aiService.analyzePage() → API de IA
     │
     ├─4─► aiService.generateSummary()
-    │     └── Combines analyses → IMRyD summary
+    │     └── Combina análisis → resumen IMRyD
     │
     └─5─► structureService.buildFileTree()
-          └── Organizes for UI consumption
+          └── Organiza para consumo de la UI
 ```
 
-### 3. SSE Events
+### 3. Eventos SSE
 ```javascript
-// Event types sent to client
+// Tipos de eventos enviados al cliente
 { type: 'log', text: '...', color: '...' }
 { type: 'progress', percent: 45 }
 { type: 'complete', result: {...} }
 { type: 'error', message: '...' }
 ```
 
-## Directory Structure
+## Estructura de Directorios
 
 ```
 medical_article_summarizer/
-├── .env.example          # Environment template
+├── .env.example          # Plantilla de entorno
 ├── .gitignore
-├── package.json          # Root scripts (dev, build)
+├── package.json          # Scripts raíz (dev, build)
 ├── README.md
-├── SECURITY.md           # Security documentation
+├── SECURITY.md           # Documentación de seguridad
 │
-├── client/               # React frontend (Vite)
+├── client/               # Frontend React (Vite)
 │   ├── src/
-│   │   ├── App.jsx       # Main component
+│   │   ├── App.jsx       # Componente principal
 │   │   ├── components/
 │   │   │   ├── FileUploader.jsx
 │   │   │   ├── TerminalLog.jsx
 │   │   │   └── SummaryViewer.jsx
 │   │   └── hooks/
-│   │       └── useProcessing.js  # SSE client hook
+│   │       └── useProcessing.js  # Hook cliente SSE
 │   └── vite.config.js
 │
-└── server/               # Express backend
-    ├── index.js          # Server entry, middleware
+└── server/               # Backend Express
+    ├── index.js          # Entrada del servidor, middleware
     ├── config/
-    │   └── env.js        # dotenv loader
+    │   └── env.js        # Cargador de dotenv
     ├── controllers/
-    │   └── pdfController.js  # Main orchestrator
+    │   └── pdfController.js  # Orquestador principal
     ├── services/
-    │   ├── pdfService.js     # PDF extraction
-    │   ├── aiService.js      # LLM integration
+    │   ├── pdfService.js     # Extracción de PDF
+    │   ├── aiService.js      # Integración con LLM
     │   └── structureService.js
     ├── middleware/
-    │   └── rateLimiter.js    # Rate limiting (new)
+    │   └── rateLimiter.js    # Rate limiting
     ├── utils/
-    │   ├── prompts.js        # System prompts
-    │   ├── prompts.v2.js     # Anti-hallucination prompts
-    │   └── pdfValidator.js   # Security validation (new)
+    │   ├── prompts.js        # Prompts del sistema
+    │   ├── prompts.v2.js     # Prompts anti-alucinación
+    │   └── pdfValidator.js   # Validación de seguridad
     ├── tests/
     │   └── pdfService.test.js
-    └── uploads/          # Temporary PDF storage
+    └── uploads/          # Almacenamiento temporal de PDFs
 ```
 
-## Key Design Decisions
+## Decisiones de Diseño Clave
 
-### 1. SSE over WebSockets
-- **Why**: Simpler, unidirectional, native browser support
-- **Trade-off**: No bidirectional communication (not needed)
+### 1. SSE en lugar de WebSockets
+- **Por qué**: Más simple, unidireccional, soporte nativo del navegador
+- **Compromiso**: Sin comunicación bidireccional (no es necesaria)
 
-### 2. pdf-parse Library
-- **Why**: Zero dependencies, pure JavaScript
-- **Limitation**: No layout analysis (columns, tables)
-- **Future**: Consider pdfplumber or PyMuPDF wrapper
+### 2. Librería pdf-parse
+- **Por qué**: Cero dependencias, JavaScript puro
+- **Limitación**: Sin análisis de layout (columnas, tablas)
+- **Futuro**: Considerar pdfplumber o wrapper de PyMuPDF
 
-### 3. OpenRouter Gateway
-- **Why**: Single API for multiple LLM providers
-- **Benefit**: Easy model switching via environment variable
-- **Risk**: Vendor dependency (mitigate with local model option)
+### 3. Gateway OpenRouter
+- **Por qué**: API única para múltiples proveedores de LLM
+- **Beneficio**: Cambio fácil de modelo via variable de entorno
+- **Riesgo**: Dependencia de proveedor (mitigado con opción de modelo local)
 
-### 4. Sequential Page Processing
-- **Why**: Simpler error handling, predictable progress
-- **Limitation**: Slow for large documents
-- **Future**: Batch processing or parallel workers
+### 4. Procesamiento Secuencial de Páginas
+- **Por qué**: Manejo de errores más simple, progreso predecible
+- **Limitación**: Lento para documentos grandes
+- **Futuro**: Procesamiento por lotes o workers paralelos
 
-### 5. Temporary File Storage
-- **Why**: Avoids memory issues with large PDFs
-- **Security**: Files deleted after processing
-- **Future**: Consider streaming for memory efficiency
+### 5. Almacenamiento Temporal de Archivos
+- **Por qué**: Evita problemas de memoria con PDFs grandes
+- **Seguridad**: Archivos eliminados después del procesamiento
+- **Futuro**: Considerar streaming para eficiencia de memoria
 
-## Configuration
+## Configuración
 
-### Environment Variables
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `OPENAI_API_KEY` | Yes | OpenRouter API key |
-| `MODEL` | No | LLM model (default: free tier) |
-| `PORT` | No | Server port (default: 3001) |
-| `CLIENT_URL` | No | CORS origin (default: localhost:5173) |
+### Variables de Entorno
+| Variable | Requerida | Descripción |
+|----------|-----------|-------------|
+| `CHUTES_API_KEY` | Sí* | API key del proveedor de IA |
+| `MODEL` | No | Modelo LLM (default: tier gratuito) |
+| `PORT` | No | Puerto del servidor (default: 3001) |
+| `CLIENT_URL` | No | Origen CORS (default: localhost:5173) |
+| `USE_OLLAMA` | No | Usar Ollama local (default: false) |
 
-### Limits
-| Resource | Limit | Configurable |
-|----------|-------|--------------|
-| File size | 50MB | pdfController.js L45 |
-| Pages | None currently | Recommended: add |
-| Rate limit | None currently | Implemented in rateLimiter.js |
+*No requerida si USE_OLLAMA=true
 
-## Security Considerations
+### Límites
+| Recurso | Límite | Configurable |
+|---------|--------|--------------|
+| Tamaño de archivo | 50MB | pdfController.js |
+| Páginas | 100 | Variable MAX_PAGES |
+| Rate limit | 5/min | rateLimiter.js |
 
-See [SECURITY.md](./SECURITY.md) for full details.
+## Consideraciones de Seguridad
 
-### Current
-- MIME type validation
-- File cleanup post-processing
-- Environment variable isolation
+Ver [SECURITY.md](./SECURITY.md) para detalles completos.
 
-### Needed
-- Magic byte validation
-- Page count limits
-- Rate limiting activation
-- Prompt injection protection
+### Implementadas
+- Validación de tipo MIME
+- Limpieza de archivos post-procesamiento
+- Aislamiento de variables de entorno
+- Rate limiting
+- Validación de magic bytes
 
-## Future Improvements
+### Necesarias
+- Protección contra prompt injection
+- Sandbox para parsing de PDF
 
-### Short-term
-- [ ] Activate rate limiting in index.js
-- [ ] Add page count validation
-- [ ] Implement JSON schema validation for LLM output
-- [ ] Add medical disclaimer to UI
+## Mejoras Futuras
 
-### Medium-term
-- [ ] Better PDF parsing (tables, columns)
-- [ ] Caching layer (Redis)
-- [ ] Structured JSON output from LLM
-- [ ] Export functionality (DOCX, PDF)
+### Corto Plazo
+- [ ] Validación de esquema JSON para salida del LLM
+- [ ] Mejores mensajes de error
 
-### Long-term
-- [ ] Job queue for processing
-- [ ] Local LLM option (Ollama)
-- [ ] User authentication
-- [ ] Document history
+### Mediano Plazo
+- [ ] Mejor parsing de PDF (tablas, columnas)
+- [ ] Capa de caché (Redis)
+- [ ] Salida JSON estructurada del LLM
+- [ ] Funcionalidad de exportación (DOCX)
+
+### Largo Plazo
+- [ ] Cola de trabajos para procesamiento
+- [ ] Autenticación de usuarios
+- [ ] Historial de documentos

@@ -68,7 +68,7 @@ function TerminalLog({ logs, progress, onCancel, isProcessing }) {
       <div className="terminal-header">
         <div className="terminal-title">
           <span className="terminal-icon">⬛</span>
-          <span>Medical Summarizer - Processing Terminal</span>
+          <span>Resumen Médico - Terminal de Procesamiento</span>
         </div>
         <div className="terminal-controls">
           {isProcessing && (
@@ -102,7 +102,7 @@ function TerminalLog({ logs, progress, onCancel, isProcessing }) {
       >
         {logs.length === 0 ? (
           <div className="terminal-placeholder">
-            Waiting for file upload...
+            Esperando carga de archivo...
           </div>
         ) : (
           logs.map((log, index) => (
@@ -127,7 +127,7 @@ function TerminalLog({ logs, progress, onCancel, isProcessing }) {
             onClick={() => setIsAutoScrolling(true)}
             type="button"
           >
-            ↓ New logs ↓
+            ↓ Nuevos logs ↓
           </button>
         )}
       </div>

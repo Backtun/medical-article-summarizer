@@ -101,17 +101,17 @@ function SummaryViewer({ result, onReset }) {
           onClick={onReset}
           type="button"
         >
-          🔄 New Analysis
+          🔄 Nuevo Análisis
         </button>
       </div>
 
       {/* Info bar */}
       <div className="viewer-info">
         <span className="info-item">
-          📄 {result.totalPages} pages
+          📄 {result.totalPages} páginas
         </span>
         <span className="info-item">
-          📁 {result.structure?.parts?.length || 0} parts
+          📁 {result.structure?.parts?.length || 0} partes
         </span>
         <span className="info-item">
           ⏱️ {new Date(result.processedAt).toLocaleString()}
@@ -130,7 +130,7 @@ function SummaryViewer({ result, onReset }) {
       <div className="viewer-content">
         {/* Sidebar: Árbol de navegación */}
         <div className="viewer-sidebar">
-          <div className="sidebar-header">Document Structure</div>
+          <div className="sidebar-header">Estructura del Documento</div>
           <div className="tree-container">
             {result.fileTree?.map((node) => (
               <TreeNode
@@ -155,13 +155,13 @@ function SummaryViewer({ result, onReset }) {
               </div>
               <div className="markdown-content">
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                  {selectedNode.content || '*No content available*'}
+                  {selectedNode.content || '*No hay contenido disponible*'}
                 </ReactMarkdown>
               </div>
             </div>
           ) : (
             <div className="empty-state">
-              <p>Select a section from the tree to view its content</p>
+              <p>Selecciona una sección del árbol para ver su contenido</p>
             </div>
           )}
         </div>

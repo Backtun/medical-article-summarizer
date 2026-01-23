@@ -106,7 +106,7 @@ export async function analyzePage(pageText, pageNumber, onLog) {
 
   try {
     const estimatedInputTokens = estimateTokens(systemPrompt) + estimateTokens(pageText);
-    log(`🤖 Analyzing page ${pageNumber} (~${estimatedInputTokens} tokens)...`, 'cyan');
+    log(`🤖 Analizando página ${pageNumber} (~${estimatedInputTokens} tokens)...`, 'cyan');
 
     const response = await client.chat.completions.create({
       model: model,
@@ -128,21 +128,21 @@ export async function analyzePage(pageText, pageNumber, onLog) {
 
     // Validate API response structure
     if (!response.choices || !response.choices[0] || !response.choices[0].message) {
-      throw new Error('Invalid API response structure: missing choices or message');
+      throw new Error('Estructura de respuesta de API inválida: faltan choices o message');
     }
 
     const analysis = response.choices[0].message.content;
 
     // Handle null or empty content from API
     if (analysis === null || analysis === undefined) {
-      throw new Error(`API returned empty response for page ${pageNumber}. Please try again.`);
+      throw new Error(`La API devolvió respuesta vacía para página ${pageNumber}. Por favor intenta de nuevo.`);
     }
 
-    log(`✓ Page ${pageNumber} analyzed (${analysis.length} chars)`, 'green');
+    log(`✓ Página ${pageNumber} analizada (${analysis.length} caracteres)`, 'green');
 
     return analysis;
   } catch (error) {
-    log(`✗ Error analyzing page ${pageNumber}: ${error.message}`, 'red');
+    log(`✗ Error analizando página ${pageNumber}: ${error.message}`, 'red');
     throw error;
   }
 }
@@ -170,7 +170,7 @@ export async function generateSummary(title, analyzedPages, onLog) {
     SUMMARY_GENERATION_PROMPT.replace('{title}', title);
 
   try {
-    log('📝 Generating structured summary (IMRyD format)...', 'yellow');
+    log('📝 Generando resumen estructurado (formato IMRyD)...', 'yellow');
 
     // Combine page analyses
     const combinedAnalysis = analyzedPages
@@ -189,7 +189,7 @@ export async function generateSummary(title, analyzedPages, onLog) {
       combinedText;
 
     const estimatedInputTokens = estimateTokens(systemPrompt) + estimateTokens(combinedAnalysis) + estimateTokens(truncatedText);
-    log(`📊 Estimated input: ~${estimatedInputTokens} tokens`, 'gray');
+    log(`📊 Entrada estimada: ~${estimatedInputTokens} tokens`, 'gray');
 
     const response = await client.chat.completions.create({
       model: model,
@@ -212,15 +212,15 @@ export async function generateSummary(title, analyzedPages, onLog) {
 
     // Validate API response structure
     if (!response.choices || !response.choices[0] || !response.choices[0].message) {
-      throw new Error('Invalid API response structure: missing choices or message');
+      throw new Error('Estructura de respuesta de API inválida: faltan choices o message');
     }
 
     let summary = response.choices[0].message.content;
 
     // Handle null or empty content from API
     if (summary === null || summary === undefined) {
-      log('⚠ API returned null content, attempting retry...', 'orange');
-      throw new Error('API returned empty response. This may be due to content filtering or rate limiting. Please try again.');
+      log('⚠ La API devolvió contenido nulo, intentando de nuevo...', 'orange');
+      throw new Error('La API devolvió respuesta vacía. Esto puede deberse a filtrado de contenido o límite de solicitudes. Por favor intenta de nuevo.');
     }
 
     // If using v2 prompts, try to parse and validate JSON
@@ -235,27 +235,27 @@ export async function generateSummary(title, analyzedPages, onLog) {
         const validation = validateIMRyDResponse(parsed);
 
         if (!validation.valid) {
-          log(`⚠ JSON validation warnings: ${validation.errors.join(', ')}`, 'orange');
+          log(`⚠ Advertencias de validación JSON: ${validation.errors.join(', ')}`, 'orange');
         }
 
         // Convert JSON back to Markdown for display
         summary = convertIMRyDToMarkdown(parsed);
-        log('✓ Structured summary validated', 'green');
+        log('✓ Resumen estructurado validado', 'green');
       } catch (parseError) {
         // If JSON parsing fails, fall back to raw response
-        log('⚠ Could not parse structured response, using raw output', 'orange');
+        log('⚠ No se pudo parsear la respuesta estructurada, usando salida sin procesar', 'orange');
       }
     }
 
-    log(`✓ Summary generated (${summary.length} chars)`, 'green');
+    log(`✓ Resumen generado (${summary.length} caracteres)`, 'green');
 
     // Log session token usage
     const usage = getTokenUsage();
-    log(`📊 Session tokens: ${usage.total} total (${usage.prompt} input, ${usage.completion} output)`, 'gray');
+    log(`📊 Tokens de sesión: ${usage.total} total (${usage.prompt} entrada, ${usage.completion} salida)`, 'gray');
 
     return summary;
   } catch (error) {
-    log(`✗ Error generating summary: ${error.message}`, 'red');
+    log(`✗ Error generando resumen: ${error.message}`, 'red');
     throw error;
   }
 }

@@ -132,7 +132,7 @@ app.get('/api/info', (req, res) => {
     limits: {
       maxFileSize: '50MB',
       maxPages: Number(process.env.MAX_PAGES) || 100,
-      rateLimit: '5 uploads per minute',
+      rateLimit: '5 cargas por minuto',
       parsingTimeout: `${(Number(process.env.PARSING_TIMEOUT_MS) || 60000) / 1000}s`
     },
     features: {
@@ -154,7 +154,7 @@ if (!IS_PRODUCTION) {
   app.post('/api/cache/clear', (req, res) => {
     clearAllCaches();
     res.json({
-      message: 'Cache cleared',
+      message: 'Caché limpiada',
       timestamp: new Date().toISOString()
     });
   });
@@ -182,7 +182,7 @@ if (!IS_PRODUCTION) {
       const job = getJob(req.params.jobId);
       if (!job) {
         return res.status(404).json({
-          error: 'Job not found'
+          error: 'Trabajo no encontrado'
         });
       }
       res.json(job);
@@ -234,8 +234,8 @@ if (IS_PRODUCTION) {
 // 404 handler
 app.use((req, res, next) => {
   res.status(404).json({
-    error: 'Not Found',
-    message: `Route ${req.method} ${req.path} not found`
+    error: 'No encontrado',
+    message: `Ruta ${req.method} ${req.path} no encontrada`
   });
 });
 
@@ -249,11 +249,11 @@ app.use((err, req, res, next) => {
 
   // Sanitize error message for production
   const message = IS_PRODUCTION ?
-    (statusCode === 500 ? 'Internal Server Error' : err.message) :
+    (statusCode === 500 ? 'Error interno del servidor' : err.message) :
     err.message;
 
   res.status(statusCode).json({
-    error: statusCode === 500 ? 'Internal Server Error' : 'Error',
+    error: statusCode === 500 ? 'Error interno del servidor' : 'Error',
     message,
     ...(IS_PRODUCTION ? {} : {
       stack: err.stack

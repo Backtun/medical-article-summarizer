@@ -35,7 +35,7 @@ export function validatePDFMagicBytes(filePath) {
   }
 
   if (!buffer.equals(PDF_MAGIC_BYTES)) {
-    throw new Error('Invalid PDF: File does not start with PDF magic bytes (%PDF-)');
+    throw new Error('PDF inválido: El archivo no comienza con los bytes mágicos de PDF (%PDF-)');
   }
 
   return true;
@@ -54,7 +54,7 @@ export function validateFileSize(filePath, maxSize = MAX_FILE_SIZE) {
   if (stats.size > maxSize) {
     const sizeMB = (stats.size / (1024 * 1024)).toFixed(2);
     const maxMB = (maxSize / (1024 * 1024)).toFixed(0);
-    throw new Error(`File size (${sizeMB}MB) exceeds maximum allowed (${maxMB}MB)`);
+    throw new Error(`Tamaño del archivo (${sizeMB}MB) excede el máximo permitido (${maxMB}MB)`);
   }
 
   return true;
@@ -69,11 +69,11 @@ export function validateFileSize(filePath, maxSize = MAX_FILE_SIZE) {
  */
 export function validatePageCount(pageCount, maxPages = MAX_PAGES) {
   if (typeof pageCount !== 'number' || pageCount < 1) {
-    throw new Error('Invalid page count: PDF appears to be empty or corrupted');
+    throw new Error('Número de páginas inválido: El PDF parece estar vacío o corrupto');
   }
 
   if (pageCount > maxPages) {
-    throw new Error(`PDF has ${pageCount} pages, which exceeds the maximum of ${maxPages} pages`);
+    throw new Error(`El PDF tiene ${pageCount} páginas, lo cual excede el máximo de ${maxPages} páginas`);
   }
 
   return true;
@@ -86,12 +86,12 @@ export function validatePageCount(pageCount, maxPages = MAX_PAGES) {
  * @param {string} operation - Description of the operation (for error message)
  * @returns {Promise}
  */
-export function withTimeout(promise, timeoutMs = PARSING_TIMEOUT_MS, operation = 'Operation') {
+export function withTimeout(promise, timeoutMs = PARSING_TIMEOUT_MS, operation = 'Operación') {
   return Promise.race([
     promise,
     new Promise((_, reject) => {
       setTimeout(() => {
-        reject(new Error(`${operation} timed out after ${timeoutMs / 1000} seconds`));
+        reject(new Error(`${operation} agotó el tiempo después de ${timeoutMs / 1000} segundos`));
       }, timeoutMs);
     })
   ]);
@@ -127,7 +127,7 @@ export function validatePDF(filePath, options = {}) {
     result.fileSize = stats.size;
 
     if (stats.size > maxSize) {
-      result.errors.push(`File size (${(stats.size / 1024 / 1024).toFixed(2)}MB) exceeds limit`);
+      result.errors.push(`Tamaño del archivo (${(stats.size / 1024 / 1024).toFixed(2)}MB) excede el límite`);
     } else {
       result.checks.fileSize = true;
     }

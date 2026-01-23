@@ -67,7 +67,7 @@ function App() {
     setIsProcessing(false);
     setLogs(prev => [...prev, {
       type: 'log',
-      text: 'Processing cancelled by user',
+      text: 'Procesamiento cancelado por el usuario',
       color: 'orange',
       timestamp: new Date().toISOString()
     }]);
@@ -138,7 +138,7 @@ function App() {
           ⚠️ Generado por IA • No constituye consejo médico • Verificar siempre con el documento original
         </p>
         <p className="footer-tech">
-          Powered by OpenRouter AI • MERN Stack • v1.0.0
+          Desarrollado por Conciencia Artificial • v1.0.0
         </p>
       </footer>
     </div>

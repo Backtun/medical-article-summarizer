@@ -1,117 +1,117 @@
-# Contributing to Medical Article Summarizer
+# Contribuir a Medical Article Summarizer
 
-Thank you for your interest in contributing! This document provides guidelines for contributing to the project.
+¡Gracias por tu interés en contribuir! Este documento proporciona las guías para contribuir al proyecto.
 
-## Development Setup
+## Configuración del Entorno de Desarrollo
 
-1. **Clone the repository**
+1. **Clonar el repositorio**
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/tu-usuario/medical-article-summarizer.git
    cd medical-article-summarizer
    ```
 
-2. **Install dependencies**
+2. **Instalar dependencias**
    ```bash
    npm run install:all
    ```
 
-3. **Set up environment**
+3. **Configurar el entorno**
    ```bash
    cp .env.example .env
-   # Edit .env with your OpenRouter API key
+   # Edita .env con tu API key
    ```
 
-4. **Start development servers**
+4. **Iniciar los servidores de desarrollo**
    ```bash
    npm run dev
    ```
 
-## Code Style
+## Estilo de Código
 
-We use ESLint and Prettier for code formatting. Before committing:
+Usamos ESLint y Prettier para el formato del código. Antes de hacer commit:
 
 ```bash
-# Check for linting issues
+# Verificar problemas de linting
 npm run lint
 
-# Auto-fix issues
+# Corregir automáticamente
 npm run lint:fix
 
-# Format code
+# Formatear código
 npm run format
 ```
 
-### Style Guidelines
+### Guías de Estilo
 
-- Use **single quotes** for strings
-- Use **2 spaces** for indentation
-- Use **semicolons** at end of statements
-- Use **arrow functions** where appropriate
-- Add **JSDoc comments** for public functions
+- Usa **comillas simples** para strings
+- Usa **2 espacios** para indentación
+- Usa **punto y coma** al final de las declaraciones
+- Usa **arrow functions** cuando sea apropiado
+- Agrega **comentarios JSDoc** para funciones públicas
 
-## Git Workflow
+## Flujo de Trabajo con Git
 
-1. **Create a feature branch**
+1. **Crear una rama de feature**
    ```bash
-   git checkout -b feature/your-feature-name
+   git checkout -b feature/nombre-de-tu-feature
    ```
 
-2. **Make your changes**
-   - Write clear, descriptive commit messages
-   - Keep commits focused and atomic
-   - Reference issue numbers when applicable
+2. **Realiza tus cambios**
+   - Escribe mensajes de commit claros y descriptivos
+   - Mantén los commits enfocados y atómicos
+   - Referencia números de issue cuando aplique
 
-3. **Run tests before committing**
+3. **Ejecuta los tests antes de hacer commit**
    ```bash
    npm run test --prefix server
    ```
 
-4. **Push and create a Pull Request**
+4. **Haz push y crea un Pull Request**
    ```bash
-   git push origin feature/your-feature-name
+   git push origin feature/nombre-de-tu-feature
    ```
 
-## Pull Request Guidelines
+## Guías para Pull Requests
 
-- Provide a clear description of the changes
-- Include screenshots for UI changes
-- Ensure all tests pass
-- Update documentation if needed
-- Link to related issues
+- Proporciona una descripción clara de los cambios
+- Incluye capturas de pantalla para cambios en la UI
+- Asegúrate de que todos los tests pasen
+- Actualiza la documentación si es necesario
+- Enlaza a issues relacionados
 
-## Security
+## Seguridad
 
-- **Never commit API keys** or secrets
-- Use `.env` for sensitive configuration
-- Report security issues privately (see SECURITY.md)
+- **Nunca hagas commit de API keys** o secretos
+- Usa `.env` para configuración sensible
+- Reporta problemas de seguridad de forma privada (ver SECURITY.md)
 
 ## Testing
 
-- Add tests for new features
-- Maintain test coverage
-- Use descriptive test names
+- Agrega tests para nuevas funcionalidades
+- Mantén la cobertura de tests
+- Usa nombres descriptivos para los tests
 
 ```bash
-# Run server tests
+# Ejecutar tests del servidor
 npm run test --prefix server
 
-# Run with coverage (when configured)
+# Ejecutar con cobertura (cuando esté configurado)
 npm run test:coverage --prefix server
 ```
 
-## Documentation
+## Documentación
 
-- Update README.md for user-facing changes
-- Update ARCHITECTURE.md for structural changes
-- Add JSDoc comments for new functions
-- Keep comments up to date
+- Actualiza README.md para cambios que afecten al usuario
+- Actualiza ARCHITECTURE.md para cambios estructurales
+- Agrega comentarios JSDoc para nuevas funciones
+- Mantén los comentarios actualizados
 
-## Need Help?
+## ¿Necesitas Ayuda?
 
-- Open an issue for bugs or feature requests
-- Ask questions in issue discussions
-- Check existing issues before creating new ones
+- Abre un issue para bugs o solicitudes de features
+- Haz preguntas en las discusiones de issues
+- Revisa los issues existentes antes de crear uno nuevo
 
-## License
+## Licencia
 
-By contributing, you agree that your contributions will be licensed under the MIT License.
+Al contribuir, aceptas que tus contribuciones serán licenciadas bajo la Licencia MIT.

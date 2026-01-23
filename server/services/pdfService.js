@@ -20,7 +20,7 @@ export async function extractTextFromPDF(pdfPath, onLog) {
   };
 
   try {
-    log('📄 Loading PDF file...', 'cyan');
+    log('📄 Cargando archivo PDF...', 'cyan');
 
     const dataBuffer = fs.readFileSync(pdfPath);
     const pageTexts = [];
@@ -54,7 +54,7 @@ export async function extractTextFromPDF(pdfPath, onLog) {
       pagerender: renderPage
     });
 
-    log(`✓ PDF loaded: ${pdfData.numpages} pages detected`, 'green');
+    log(`✓ PDF cargado: ${pdfData.numpages} páginas detectadas`, 'green');
 
     let pages = [];
     let hasAllPages = pageTexts.length === pdfData.numpages;
@@ -76,7 +76,7 @@ export async function extractTextFromPDF(pdfPath, onLog) {
         };
       });
     } else {
-      log('⚠ Page-level extraction incomplete; using fallback segmentation.', 'orange');
+      log('⚠ Extracción por página incompleta; usando segmentación de respaldo.', 'orange');
       pages = splitIntoPages(pdfData.text, pdfData.numpages);
     }
 
@@ -88,7 +88,7 @@ export async function extractTextFromPDF(pdfPath, onLog) {
       rawData: dataBuffer
     };
   } catch (error) {
-    log(`✗ Error loading PDF: ${error.message}`, 'red');
+    log(`✗ Error cargando PDF: ${error.message}`, 'red');
     throw error;
   }
 }
@@ -158,7 +158,7 @@ export function detectStructure(pages, onLog) {
     if (onLog) onLog(message, color);
   };
 
-  log('🔍 Analyzing document structure...', 'cyan');
+  log('🔍 Analizando estructura del documento...', 'cyan');
 
   const structure = {
     parts: [],
@@ -205,7 +205,7 @@ export function detectStructure(pages, onLog) {
           chapters: []
         };
         structure.parts.push(currentPart);
-        log(`  📁 Detected: ${currentPart.title}`, 'magenta');
+        log(`  📁 Detectado: ${currentPart.title}`, 'magenta');
       }
 
       if (chapterMatch && currentPart) {
@@ -218,7 +218,7 @@ export function detectStructure(pages, onLog) {
         };
         currentPart.chapters.push(currentChapter);
         structure.chapters.push(currentChapter);
-        log(`    📂 Detected: ${currentChapter.title}`, 'blue');
+        log(`    📂 Detectado: ${currentChapter.title}`, 'blue');
       }
 
       // Check for IMRyD sections
@@ -229,7 +229,7 @@ export function detectStructure(pages, onLog) {
             title: trimmedLine,
             detected: true
           };
-          log(`  🔬 IMRyD Section: ${sectionName.toUpperCase()} (page ${page.pageNumber})`, 'cyan');
+          log(`  🔬 Sección IMRyD: ${sectionName.toUpperCase()} (página ${page.pageNumber})`, 'cyan');
         }
       }
     }
@@ -253,12 +253,12 @@ export function detectStructure(pages, onLog) {
 
   // Summary log
   if (structure.isIMRyDFormat) {
-    log(`✓ IMRyD format detected (${detectedImrydCount}/4 sections)`, 'green');
+    log(`✓ Formato IMRyD detectado (${detectedImrydCount}/4 secciones)`, 'green');
   } else {
-    log(`⚠ Standard IMRyD format not detected (${detectedImrydCount}/4 sections)`, 'orange');
+    log(`⚠ Formato IMRyD estándar no detectado (${detectedImrydCount}/4 secciones)`, 'orange');
   }
 
-  log(`✓ Structure analysis: ${structure.parts.length} parts, ${structure.chapters.length} chapters`, 'green');
+  log(`✓ Análisis de estructura: ${structure.parts.length} partes, ${structure.chapters.length} capítulos`, 'green');
 
   return structure;
 }

@@ -1,105 +1,105 @@
-# Security Policy
+# Política de Seguridad
 
-## Supported Versions
+## Versiones Soportadas
 
-| Version | Supported          |
+| Versión | Soportada          |
 | ------- | ------------------ |
 | 1.x     | :white_check_mark: |
 
-## Reporting a Vulnerability
+## Reportar una Vulnerabilidad
 
-If you discover a security vulnerability, please report it responsibly:
+Si descubres una vulnerabilidad de seguridad, por favor repórtala de manera responsable:
 
-1. **DO NOT** open a public GitHub issue
-2. Email security concerns to the project maintainers
-3. Include a detailed description of the vulnerability
-4. Allow reasonable time for a fix before public disclosure
+1. **NO** abras un issue público en GitHub
+2. Envía un correo con los detalles de seguridad a los mantenedores del proyecto
+3. Incluye una descripción detallada de la vulnerabilidad
+4. Permite un tiempo razonable para la corrección antes de la divulgación pública
 
-## Security Measures
+## Medidas de Seguridad
 
-### Currently Implemented
+### Implementadas Actualmente
 
-- ✅ PDF MIME type validation
-- ✅ File size limits (50MB maximum)
-- ✅ Temporary file cleanup after processing
-- ✅ Environment variable isolation for API keys
-- ✅ CORS configuration
-- ✅ `.env` excluded from version control
+- ✅ Validación de tipo MIME para PDFs
+- ✅ Límites de tamaño de archivo (máximo 50MB)
+- ✅ Limpieza de archivos temporales después del procesamiento
+- ✅ Aislamiento de variables de entorno para API keys
+- ✅ Configuración de CORS
+- ✅ `.env` excluido del control de versiones
 
-### Planned Improvements
+### Mejoras Planificadas
 
-- 🔲 Rate limiting (requests per IP)
-- 🔲 PDF magic byte validation
-- 🔲 Maximum page count limits
-- 🔲 Parsing timeout protection
-- 🔲 Sandboxed PDF parsing
-- 🔲 Content Security Policy headers
-- 🔲 CSRF protection
+- 🔲 Rate limiting (solicitudes por IP)
+- 🔲 Validación de magic bytes de PDF
+- 🔲 Límites máximos de páginas
+- 🔲 Protección por timeout en el parsing
+- 🔲 Parsing de PDF en sandbox
+- 🔲 Headers de Content Security Policy
+- 🔲 Protección CSRF
 
-## Handling Sensitive Data
+## Manejo de Datos Sensibles
 
-### Document Processing
+### Procesamiento de Documentos
 
-- PDFs are stored temporarily in `/server/uploads/` during processing
-- Files are automatically deleted after processing completes or fails
-- Document content is sent to OpenRouter API for AI analysis
-- No persistent storage of document content on the server
+- Los PDFs se almacenan temporalmente en `/server/uploads/` durante el procesamiento
+- Los archivos se eliminan automáticamente después de que el procesamiento termine o falle
+- El contenido del documento se envía a la API de IA para el análisis
+- No hay almacenamiento persistente del contenido del documento en el servidor
 
 ### Logging
 
-- Production logs should NOT contain document text
-- API keys are never logged
-- SSE events may contain preview text (configurable)
+- Los logs de producción NO deben contener texto del documento
+- Las API keys nunca se registran en logs
+- Los eventos SSE pueden contener texto de vista previa (configurable)
 
-### Third-Party Services
+### Servicios de Terceros
 
-- **OpenRouter API**: Document text is sent for AI processing
-- Review OpenRouter's privacy policy for data handling details
-- Consider "no-store" mode for sensitive documents (planned feature)
+- **API de OpenRouter/Chutes**: El texto del documento se envía para procesamiento de IA
+- Revisa la política de privacidad del proveedor de IA para detalles sobre el manejo de datos
+- Considera el modo "no-store" para documentos sensibles (funcionalidad planificada)
 
-## PDF Security Considerations
+## Consideraciones de Seguridad para PDFs
 
-PDFs can be attack vectors. This application implements:
+Los PDFs pueden ser vectores de ataque. Esta aplicación implementa:
 
-1. **Type Validation**: Checks MIME type before processing
-2. **Size Limits**: Rejects files over 50MB
-3. **Cleanup**: Removes uploaded files after processing
+1. **Validación de Tipo**: Verifica el tipo MIME antes del procesamiento
+2. **Límites de Tamaño**: Rechaza archivos mayores a 50MB
+3. **Limpieza**: Elimina archivos subidos después del procesamiento
 
-### Known Risks
+### Riesgos Conocidos
 
-- **PDF parsing exploits**: The `pdf-parse` library processes PDFs in the main process
-- **Resource exhaustion**: Large or complex PDFs may consume significant memory
-- **Prompt injection**: Malicious PDF content could attempt to manipulate AI behavior
+- **Exploits en parsing de PDF**: La librería `pdf-parse` procesa PDFs en el proceso principal
+- **Agotamiento de recursos**: PDFs grandes o complejos pueden consumir mucha memoria
+- **Prompt injection**: Contenido malicioso en PDFs podría intentar manipular el comportamiento de la IA
 
-## Best Practices for Deployment
+## Mejores Prácticas para Despliegue
 
-1. **Never commit `.env`** files with real API keys
-2. **Use HTTPS** in production
-3. **Set restrictive CORS** origins
-4. **Enable rate limiting** to prevent abuse
-5. **Monitor** API usage and costs
-6. **Rotate API keys** periodically
+1. **Nunca hagas commit de archivos `.env`** con API keys reales
+2. **Usa HTTPS** en producción
+3. **Configura orígenes CORS restrictivos**
+4. **Habilita rate limiting** para prevenir abuso
+5. **Monitorea** el uso de la API y los costos
+6. **Rota las API keys** periódicamente
 
-## Environment Variables
+## Variables de Entorno
 
-Ensure these are properly secured:
+Asegúrate de que estas estén correctamente protegidas:
 
-| Variable | Sensitivity | Notes |
-|----------|-------------|-------|
-| `OPENAI_API_KEY` | **HIGH** | Never log or expose |
-| `PORT` | Low | Internal configuration |
-| `CLIENT_URL` | Low | Used for CORS |
-| `MODEL` | Low | AI model selection |
+| Variable | Sensibilidad | Notas |
+|----------|--------------|-------|
+| `CHUTES_API_KEY` | **ALTA** | Nunca logear o exponer |
+| `PORT` | Baja | Configuración interna |
+| `CLIENT_URL` | Baja | Usado para CORS |
+| `MODEL` | Baja | Selección del modelo de IA |
 
-## Disclaimer
+## Aviso Legal
 
-This application generates AI-based summaries of medical articles. These summaries:
+Esta aplicación genera resúmenes basados en IA de artículos médicos. Estos resúmenes:
 
-- Are **informational only** and do not constitute medical advice
-- May contain errors or omissions
-- Should always be verified against the original document
-- Should not be used for clinical decision-making without expert review
+- Son **solo informativos** y no constituyen consejo médico
+- Pueden contener errores u omisiones
+- Siempre deben verificarse contra el documento original
+- No deben usarse para toma de decisiones clínicas sin revisión de expertos
 
 ---
 
-Last updated: 2026-01-17
+Última actualización: 2026-01-22
