@@ -126,7 +126,17 @@ export async function analyzePage(pageText, pageNumber, onLog) {
     // Track token usage
     trackTokenUsage(response.usage);
 
+    // Validate API response structure
+    if (!response.choices || !response.choices[0] || !response.choices[0].message) {
+      throw new Error('Invalid API response structure: missing choices or message');
+    }
+
     const analysis = response.choices[0].message.content;
+
+    // Handle null or empty content from API
+    if (analysis === null || analysis === undefined) {
+      throw new Error(`API returned empty response for page ${pageNumber}. Please try again.`);
+    }
 
     log(`✓ Page ${pageNumber} analyzed (${analysis.length} chars)`, 'green');
 
@@ -200,7 +210,18 @@ export async function generateSummary(title, analyzedPages, onLog) {
     // Track token usage
     trackTokenUsage(response.usage);
 
+    // Validate API response structure
+    if (!response.choices || !response.choices[0] || !response.choices[0].message) {
+      throw new Error('Invalid API response structure: missing choices or message');
+    }
+
     let summary = response.choices[0].message.content;
+
+    // Handle null or empty content from API
+    if (summary === null || summary === undefined) {
+      log('⚠ API returned null content, attempting retry...', 'orange');
+      throw new Error('API returned empty response. This may be due to content filtering or rate limiting. Please try again.');
+    }
 
     // If using v2 prompts, try to parse and validate JSON
     if (USE_V2_PROMPTS) {
