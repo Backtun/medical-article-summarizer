@@ -7,7 +7,7 @@
  * - Resumen general en formato IMRyD
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import clsx from 'clsx';
@@ -73,6 +73,18 @@ function TreeNode({ node, level = 0, onSelect, selectedId }) {
 }
 
 /**
+ * Función auxiliar para contar solo las páginas del árbol
+ * Solo cuenta nodos de tipo 'page' que tienen contenido real
+ */
+function countPages(nodes) {
+  if (!nodes || !Array.isArray(nodes)) return 0;
+  return nodes.reduce((count, node) => {
+    const isPage = node.type === 'page';
+    return count + (isPage ? 1 : 0) + countPages(node.children);
+  }, 0);
+}
+
+/**
  * Componente principal del visualizador
  */
 function SummaryViewer({ result, onReset }) {
@@ -80,6 +92,37 @@ function SummaryViewer({ result, onReset }) {
     result.fileTree?.[0] || null
   );
   const [activeTab, setActiveTab] = useState('tree');
+  const [scrollState, setScrollState] = useState({ canScrollUp: false, canScrollDown: false });
+  const treeContainerRef = useRef(null);
+
+  // Calcular el total de páginas en el árbol
+  const totalPages = countPages(result.fileTree);
+
+  // Detectar estado de scroll
+  const updateScrollState = useCallback(() => {
+    const container = treeContainerRef.current;
+    if (!container) return;
+
+    const { scrollTop, scrollHeight, clientHeight } = container;
+    const canScrollUp = scrollTop > 0;
+    const canScrollDown = scrollTop + clientHeight < scrollHeight - 1;
+
+    setScrollState({ canScrollUp, canScrollDown });
+  }, []);
+
+  useEffect(() => {
+    const container = treeContainerRef.current;
+    if (!container) return;
+
+    // Verificar estado inicial
+    updateScrollState();
+
+    // Observar cambios de tamaño
+    const resizeObserver = new ResizeObserver(updateScrollState);
+    resizeObserver.observe(container);
+
+    return () => resizeObserver.disconnect();
+  }, [updateScrollState, result.fileTree]);
 
   const handleNodeSelect = useCallback((node) => {
     setSelectedNode(node);
@@ -130,16 +173,36 @@ function SummaryViewer({ result, onReset }) {
       <div className="viewer-content">
         {/* Sidebar: Árbol de navegación */}
         <div className="viewer-sidebar">
-          <div className="sidebar-header">Estructura del Documento</div>
-          <div className="tree-container">
-            {result.fileTree?.map((node) => (
-              <TreeNode
-                key={node.id}
-                node={node}
-                onSelect={handleNodeSelect}
-                selectedId={selectedNode?.id}
-              />
-            ))}
+          <div className="sidebar-header">
+            <span>Estructura del Documento</span>
+            <span className="sidebar-count">{totalPages} {totalPages === 1 ? 'página' : 'páginas'}</span>
+          </div>
+          <div className="tree-wrapper">
+            {scrollState.canScrollUp && (
+              <div className="scroll-indicator scroll-indicator--top" aria-hidden="true">
+                <span className="scroll-indicator-icon">▲</span>
+              </div>
+            )}
+            <div
+              ref={treeContainerRef}
+              className="tree-container"
+              onScroll={updateScrollState}
+            >
+              {result.fileTree?.map((node) => (
+                <TreeNode
+                  key={node.id}
+                  node={node}
+                  onSelect={handleNodeSelect}
+                  selectedId={selectedNode?.id}
+                />
+              ))}
+            </div>
+            {scrollState.canScrollDown && (
+              <div className="scroll-indicator scroll-indicator--bottom" aria-hidden="true">
+                <span className="scroll-indicator-icon">▼</span>
+                <span className="scroll-indicator-text">Desplaza para ver más</span>
+              </div>
+            )}
           </div>
         </div>
 

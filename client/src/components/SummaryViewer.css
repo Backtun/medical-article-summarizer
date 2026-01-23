@@ -6,6 +6,8 @@
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+  flex: 1;
+  min-height: 0; /* Importante para contener el overflow en flexbox */
 }
 
 .viewer-header {
@@ -111,9 +113,12 @@
 /* Content Layout */
 .viewer-content {
   display: grid;
-  grid-template-columns: 300px 1fr;
+  grid-template-columns: minmax(280px, 320px) 1fr;
   gap: 1.5rem;
-  min-height: 600px;
+  flex: 1;
+  min-height: 400px;
+  max-height: 100%;
+  overflow: hidden;
 }
 
 /* Sidebar */
@@ -122,6 +127,9 @@
   border-radius: var(--radius-lg);
   border: 1px solid var(--color-border);
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
 .sidebar-header {
@@ -129,12 +137,111 @@
   font-weight: 600;
   border-bottom: 1px solid var(--color-border);
   background: var(--color-bg-tertiary);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.sidebar-count {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  background: var(--color-bg);
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--radius-sm);
+}
+
+/* Tree wrapper for scroll indicators */
+.tree-wrapper {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .tree-container {
   padding: 0.5rem 0;
-  max-height: 550px;
+  flex: 1;
   overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
+}
+
+/* Custom scrollbar for webkit browsers */
+.tree-container::-webkit-scrollbar {
+  width: 8px;
+}
+
+.tree-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.tree-container::-webkit-scrollbar-thumb {
+  background-color: var(--color-border);
+  border-radius: 4px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+.tree-container::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-text-secondary);
+}
+
+/* Scroll indicators */
+.scroll-indicator {
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  pointer-events: none;
+  z-index: 1;
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.scroll-indicator--top {
+  top: 0;
+  background: linear-gradient(
+    to bottom,
+    var(--color-bg-secondary) 0%,
+    var(--color-bg-secondary) 40%,
+    transparent 100%
+  );
+}
+
+.scroll-indicator--bottom {
+  bottom: 0;
+  background: linear-gradient(
+    to top,
+    var(--color-bg-secondary) 0%,
+    var(--color-bg-secondary) 40%,
+    transparent 100%
+  );
+  flex-direction: column;
+  padding: 0.75rem 0.5rem 0.5rem;
+}
+
+.scroll-indicator-icon {
+  font-size: 0.65rem;
+  color: var(--color-primary);
+  opacity: 0.9;
+}
+
+.scroll-indicator-text {
+  font-size: 0.7rem;
+  color: var(--color-text-secondary);
+  font-weight: 500;
 }
 
 /* Tree Nodes */
@@ -185,6 +292,10 @@
   border-radius: var(--radius-lg);
   border: 1px solid var(--color-border);
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  max-height: 100%;
 }
 
 .content-panel {
@@ -219,6 +330,28 @@
   padding: 1.5rem;
   overflow-y: auto;
   line-height: 1.8;
+  min-height: 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
+}
+
+.markdown-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.markdown-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.markdown-content::-webkit-scrollbar-thumb {
+  background-color: var(--color-border);
+  border-radius: 4px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+.markdown-content::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-text-secondary);
 }
 
 /* Markdown Styles */
@@ -293,18 +426,39 @@
   color: var(--color-text-secondary);
 }
 
-/* Responsive */
+/* Responsive - Pantallas grandes */
+@media (min-width: 1400px) {
+  .viewer-content {
+    grid-template-columns: minmax(320px, 380px) 1fr;
+  }
+}
+
+/* Responsive - Pantallas medianas y pequeñas */
 @media (max-width: 900px) {
   .viewer-content {
     grid-template-columns: 1fr;
+    overflow: visible;
   }
 
   .viewer-sidebar {
+    max-height: 350px;
+  }
+
+  .tree-wrapper {
     max-height: 300px;
+  }
+
+  .viewer-main {
+    min-height: 400px;
+    max-height: 60vh;
   }
 
   .viewer-actions {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .scroll-indicator-text {
+    display: none;
   }
 }

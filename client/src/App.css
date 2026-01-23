@@ -41,6 +41,7 @@ body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 /* Disclaimer Banner */
@@ -53,6 +54,7 @@ body {
   justify-content: center;
   gap: 0.75rem;
   text-align: center;
+  flex-shrink: 0; /* No permitir que el banner se comprima */
 }
 
 .disclaimer-icon {
@@ -74,6 +76,7 @@ body {
   padding: 2rem;
   text-align: center;
   border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0; /* No permitir que el header se comprima */
 }
 
 .app-header h1 {
@@ -98,12 +101,21 @@ body {
   max-width: 1400px;
   margin: 0 auto;
   width: 100%;
+  min-height: 0; /* Importante para que flex contenga el overflow */
+  display: flex;
+  flex-direction: column;
 }
 
 .upload-section,
-.terminal-section,
-.result-section {
+.terminal-section {
   margin-bottom: 2rem;
+}
+
+.result-section {
+  flex: 1;
+  min-height: 0; /* Permite que el contenido haga scroll interno */
+  display: flex;
+  flex-direction: column;
 }
 
 /* Footer */
@@ -112,6 +124,9 @@ body {
   text-align: center;
   border-top: 1px solid var(--color-border);
   background: var(--color-bg-secondary);
+  flex-shrink: 0; /* No permitir que el footer se comprima */
+  position: relative;
+  z-index: 10;
 }
 
 .footer-disclaimer {
