@@ -23,15 +23,25 @@ import {
 // Use v2 prompts if USE_PROMPTS_V2 is set
 const USE_V2_PROMPTS = process.env.USE_PROMPTS_V2 === 'true';
 
-// Configuración del cliente Chutes AI
-const client = new OpenAI({
-  baseURL: 'https://llm.chutes.ai/v1',
-  apiKey: process.env.CHUTES_API_KEY,
-  defaultHeaders: {
-    'HTTP-Referer': process.env.SITE_URL || 'http://localhost:5173',
-    'X-Title': process.env.SITE_NAME || 'Medical Summarizer'
+// Configuración del cliente Chutes AI (lazy initialization)
+let _client = null;
+
+function getClient() {
+  if (!_client) {
+    if (!process.env.CHUTES_API_KEY) {
+      throw new Error('Missing CHUTES_API_KEY. Configure it in environment variables.');
+    }
+    _client = new OpenAI({
+      baseURL: 'https://llm.chutes.ai/v1',
+      apiKey: process.env.CHUTES_API_KEY,
+      defaultHeaders: {
+        'HTTP-Referer': process.env.SITE_URL || 'http://localhost:5173',
+        'X-Title': process.env.SITE_NAME || 'Medical Summarizer'
+      }
+    });
   }
-});
+  return _client;
+}
 
 // Token tracking for cost estimation
 let sessionTokens = {
@@ -108,7 +118,7 @@ export async function analyzePage(pageText, pageNumber, onLog) {
     const estimatedInputTokens = estimateTokens(systemPrompt) + estimateTokens(pageText);
     log(`🤖 Analizando página ${pageNumber} (~${estimatedInputTokens} tokens)...`, 'cyan');
 
-    const response = await client.chat.completions.create({
+    const response = await getClient().chat.completions.create({
       model: model,
       messages: [{
           role: 'system',
@@ -191,7 +201,7 @@ export async function generateSummary(title, analyzedPages, onLog) {
     const estimatedInputTokens = estimateTokens(systemPrompt) + estimateTokens(combinedAnalysis) + estimateTokens(truncatedText);
     log(`📊 Entrada estimada: ~${estimatedInputTokens} tokens`, 'gray');
 
-    const response = await client.chat.completions.create({
+    const response = await getClient().chat.completions.create({
       model: model,
       messages: [{
           role: 'system',
